@@ -1,0 +1,135 @@
+Name1 - Dhairya Gupta
+Entry No. - 2019CS50428
+	
+Name2 - Prakhar Aggarwal
+Entry No. - 2019CS50441
+
+A) Design Overview:
+	
+1. The design of the MIPS program for evaluation of the postfix expression has been done by allocating space in memory for the stack data structure as well as for storing input string. The stack is used to store integer values as the postfix expression is evaluated from left to right.
+
+2. Input is taken in the form of a single string of characters on the console at runtime. The input should be a postfix expression else an error is raised. If an expression contains unrecognized characters i.e., characters except [0-9], +, -, /, *, %, an error is raised
+
+3. The code is divide into multiple blocks to facilitate branching statements, while loops, as well as to enhance readability of code.
+
+
+B) Design details:
+
+1. The register $t0 stores the counter variable for input string stored in '.data' segment. We end reach the end of program if we read '\n' or '\0' characters as we iterate over the input string. $t1 stores the counter variable for the integer stack. When initially empty, $t1 is initialized to zero, whenever an integer(word) is added to stack, $t1 is incremented by 4 and vice-versa. We also maintain a t4 register with $t4:=$t1-4 as index of last non-null character in stack is at $t1-4.
+
+2. Basic algorithm for postfix to value conversion is :
+
+for(i = 0; input[i]!='\n' || input[i]!=0; i++){
+	if(isDigit(input[i])) {stack.push(int(input[i]))};
+	
+	else
+	{
+		if(stack.size()<2) cout<<"InputError: not a postfix expression";
+
+		int n1 = stack.pop();
+		int n2 = stack.pop();
+	
+		if(input[i] == '+')	stack.push(n2+n1);
+		else if(input[i] == '-')	stack.push(n2-n1);
+		else if(input[i] == '*')	stack.push(n2*n1);
+		else if(input[i] == '/')	stack.push(n2/n1);
+		else if(input[i] == '%')	stack.push(n2%n1);
+		else cout<<"InputError: not a postfix expression";
+	
+	}
+}
+
+cout<<stack.top();
+stack.pop();
+
+
+3. For checking isDigit, we check ascii value (>48 and <57) and branch to isOperand block if true. Else, we check for operators and branch to corresponding operator blocks. We update the stack as necessary according to above code, and finally output the result or an error after the loop is done.
+
+
+C) Test Cases:
+Note: I am not showing cases for '/' and '%' as it was not required according to assignment specification
+
+Input messages are prompted as follows:
+
+
+enter expression:
+
+value:
+
+
+Case0. (Empty String)
+
+enter expression:
+
+InputError: not a postfix expression
+
+
+Case1. (Trivial)
+
+a)
+enter expression: 78-
+
+value: -1
+[Corresponding infix expression is 7-8]
+
+b)
+enter expression: 23+
+
+value: 5
+
+c)
+enter expression: 43*
+
+value: 12
+
+
+Case2. (Large stack with only subtraction)
+
+enter expression: 234--56-7--89-9---
+
+value: -1
+[Corresponding infix expression is (2-(3-4))-((5-6)-7)-(8-(9-4-9))]
+
+
+Case3. (Large stack with +, -, *)
+
+enter expression: 12*3+4+86*+25*-31*-85*+1-73*+
+
+value: 104
+[Corresponding infix expression is 1 * 2 + 3 + 4 + 8 * 6 - 2 * 5 - (3 * 1) + 8 * 5 - 1 + 7 * 3]
+
+
+Case 4. (Incorrect Postfix Form)
+a) 
+
+enter expression: 325*+5
+
+InputError: not a postfix expression
+
+b)
+
+enter expression: 123*+5835-+*+876++
+
+InputError: not a postfix expression
+
+
+Case5. (Unrecognized symbols)
+a)
+
+enter expression: 584++e-
+
+InputError: not a postfix expression
+
+b)
+
+enter expression: abcdefg
+
+InputError: not a postfix expression
+
+
+
+
+
+
+	
+
