@@ -1,0 +1,104 @@
+                            Prakhar Aggarwal
+                               2019CS50441
+Design :
+
+I have considered Area to be positive irrespective of whether it is below x-axis or above
+
+For area calculation, I am calculating the area bounded by the current point given by the user and the previous point (if exists) and updating the net area as user gives the points.
+
+For 2 points, there are 3 cases:
+
+Case 1 - current_y * prev_y < 0: This implies both points lie on opposite sides,
+                                 hence, on joining them, 2 triangles are formed and 
+      (area function in code)    the area to be considered is the sum of area bounded by individual triangle. 
+
+Case 2 - current_y * prev_y > 0: This implies both points lie on same side of x-axis.
+    (area_mod function in code)  For area calculation, I have calculated the area formed
+                                 by the trapezium by joining 2 points. 
+
+Case 3 - Atleast one out of current_y and prev_y is 0: If both are zero, then anyway area is 0 and is handled by the trapezium case (area function in code)
+                                                       If only one is zero, then depending on the sign of non-zero y-coordinate, it will fall in trapezium or 2 triangle category.
+                                                       Trapezium formula also boils down to triangle area if one of the coordinate's is zero and will give the correct area.
+
+Using $t1 to determine which case function will be executed to calculate area and jumping to the appropriate line using if-else analogous
+
+Will repeat this procedure on each user input and update the net area.
+When the number of inputs will reach N, I will report the Area and stop the program.
+
+Defined $f7 as zero so as check the sign of y-coordinate
+Defined $f6 as 2 so as to divide area by 2
+
+While calculating area, first I have divided and then multiplied so as to deal with overflow to some extent.
+Eg. a = 10, b = 10, c = 10;
+I want to find a*b/c
+
+Usual way: a*b = 100
+           a*b/c = 100/10 = 10
+Maximum number while computing = 100
+
+My way: a/c = 1
+        (a/c)*b = 1*10 = 10
+Maximum number while computing = 10
+
+Doing this way, the maximum number obtained while computing the expression can be significantly reduced.
+
+
+
+Testing:
+
+Order of inputs:
+
+Enter the Number of points(N): <USER_INPUT>
+x = <USER_INPUT> 
+y = <USER_INPUT> 
+<Repeating the x,y input N times>
+
+Testcases:
+
+Testcase 1:
+N =  10
+x =   4
+y =  -6
+x =   5
+y =  10
+x =   5
+y =  15
+x =   7
+y =  13
+x =   8
+y = -16
+x =  10
+y =  23
+x =  15
+y = 100
+x =  16
+y =  -3
+x =  17
+y =   5
+x =  20
+y =  20
+Area = 453.91818237 (Verified Manually)
+
+Testcase 2:
+N =  5
+x = -4
+y = -4
+x = -2
+y = -2
+x =  0
+y =  0
+x =  2
+y =  2
+x =  4
+y =  4
+Area = 16.0000000
+
+Testcase 3:
+N = 2
+x = 0
+y = 0
+x = 100000
+y = 100000
+Area = 5000000000.0000000
+
+This program can evaluate area upto 32 bits (i.e. net area shouldn't exceed 32 bits)
