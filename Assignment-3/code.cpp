@@ -19,6 +19,8 @@ struct instruction{
     string jump = "";
     string offset = "";
     string fun_label="";
+    string original = "";
+    int InstructionCount = 0;
 };
 
 vector<instruction> instr;
@@ -60,6 +62,7 @@ void tokenize(string s){
 
     while(i<s.length() && (s[i] == ' ' || s[i] == '\t'))i++;
     while(i<s.length() && s[i]!=' ' && s[i]!='\t'){fun+=s.at(i);i++;}
+    
 
     // This is some function whose label needs to be stored
     // Assuming LO and lo represent 2 different functions
@@ -74,6 +77,7 @@ void tokenize(string s){
 
     if(fun.size() == 0)return;
     if(i == s.size()){flag=true;return;}
+    ins.original = strip(s);
     s = s.substr(i,s.size()-i);
     
     vector<string> tokens;
@@ -118,6 +122,7 @@ void tokenize(string s){
         flag = true;
         return;
     }
+    
     instr.push_back(ins);
 }
 
@@ -158,7 +163,7 @@ void parse(){
     int i = 0;
     while(i<instr.size()){
         instruction ins = instr[i];
-        
+        instr[i].InstructionCount++;
         // print_ins(ins);
 
         if(ins.op == "add"){
@@ -302,10 +307,12 @@ void InstructionCount(){
 int main(int argc, char * argv[]){
     if(argc  ==  2){
         ifstream infile(argv[1]);
+        vector<string> text_file;
         if(infile.is_open()){
             std_registers();
             int ln=1;
             for(string line;getline(infile,line);){
+                text_file.push_back(line);
                 tokenize(line);
                 if(flag){
                     cout << "ERROR in Line Number: " << ln << ": "<< line << endl;
@@ -323,6 +330,16 @@ int main(int argc, char * argv[]){
                 // }
 
                 return -1;
+            }
+            else{
+                cout << "================================\n";
+                cout << "Program Execeuted Successfully\n";
+                cout << "================================\n";
+                for(int i=0;i<instr.size();i++){
+                    if(instr[i].original!=""){
+                        cout << instr[i].original << " : "  << instr[i].InstructionCount <<  "\n";
+                    }
+                }
             }
         }
         else cout << "File not found.\n";
