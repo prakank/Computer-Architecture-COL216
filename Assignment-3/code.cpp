@@ -11,8 +11,9 @@ typedef vector<ll> vi;
 vector<int> instr_count;
 map<string,int> reg,label;
 bool flag = false;
-
-
+string print_msg = "";
+vector<int> memory;
+int TotalMemory = 262144;
 
 struct instruction{
     string op="",target="",source1="",source2="";
@@ -31,7 +32,7 @@ string strip(string s){
     // cout << "->" << s << "<-\n";
     int start=0;
     while(start<s.size() && s[start] == ' ' || s[start] == '\t')start++; // removing whitespace from tokens
-    if(start == s.size()){flag=true;return "";}
+    if(start == s.size()){flag=true;print_msg = "ERROR : Syntax Error\n";return "";}
     int end = s.size()-1;
     while(end >= 0 && s[end] == ' ' || s[end] == '\t')end--;
     string s_new = s.substr(start,end-start+1);
@@ -76,14 +77,14 @@ void tokenize(string s){
     while(i<s.length() && (s[i] == ' ' || s[i] == '\t'))i++;
 
     if(fun.size() == 0)return;
-    if(i == s.size()){flag=true;return;}
+    if(i == s.size()){flag=true;print_msg = "ERROR : Incorrect Instruction\n"; return;}
     ins.original = strip(s);
     s = s.substr(i,s.size()-i);
     
     vector<string> tokens;
     boost::split(tokens,s,boost::is_any_of(","));
     
-    if(tokens.size()>3){flag=true;return;}
+    if(tokens.size()>3){flag=true;print_msg = "ERROR : Too many Arguments\n"; return;}
     for(int i=0;i<tokens.size();i++){        
         tokens[i] = strip(tokens[i]);
         if(flag)return;
@@ -93,33 +94,34 @@ void tokenize(string s){
     ins.op = fun;
     
     if(fun == "add" || fun == "sub" || fun == "mul" || fun == "slt" || fun == "addi"){
-        if(tokens.size()!=3){flag=true;return;}
+        if(tokens.size()!=3){flag=true;print_msg = "ERROR : Incorrect number of Registers\n"; return;}
         ins.target  = tokens[0];
         ins.source1 = tokens[1];
         ins.source2 = tokens[2];    
     }
     else if(fun == "beq" || fun == "bne"){
-        if(tokens.size()!=3){flag=true;return;}
+        if(tokens.size()!=3){flag=true;print_msg = "ERROR : Incorrect number of Registers\n";return;}
         ins.source1 = tokens[0];
         ins.source2 = tokens[1];
         ins.jump = tokens[2];
     }
     else if(fun == "j"){
-        if(tokens.size()!=1){flag=true;return;}
+        if(tokens.size()!=1){flag=true;print_msg = "ERROR : Incorrect number of Registers\n";return;}
         ins.jump = tokens[0];    
     }
     else if(fun == "lw" || fun == "sw"){
-        if(tokens.size()!=2){flag=true;return;}
+        if(tokens.size()!=2){flag=true;print_msg = "ERROR : Incorrect number of Registers\n";return;}
         ins.target = tokens[0];
         i=0;
         s="";
         while(i<tokens[1].size() && tokens[1][i]!='(' && (tokens[1][i] - '0' <= 9) && (tokens[1][i] - '0' >= 0) ){s+=tokens[1][i];i++;}
-        if(i == tokens[1].size() || tokens[1][i]!='('){flag=true;return;}
+        if(i == tokens[1].size() || tokens[1][i]!='('){flag=true;print_msg = "ERROR : Syntax Error\n";return;}
         ins.offset = s;
         ins.source1 = tokens[1].substr(i+1,tokens[1].size() - i - 2);
     }
     else{
         flag = true;
+        print_msg = "ERROR : Operation not Defined\n";
         return;
     }
     
@@ -159,6 +161,7 @@ void print_ins(instruction ins){
 
 int print_count = 1;
 
+
 void parse(){
     int i = 0;
     while(i<instr.size()){
@@ -168,6 +171,7 @@ void parse(){
 
         if(ins.op == "add"){
             if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() ){
+                print_msg = "ERROR : Unknown Register\n";
                 flag = true;
                 return;
             }
@@ -178,6 +182,7 @@ void parse(){
         else if(ins.op == "sub"){
             if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() ){
                 flag = true;
+                print_msg = "ERROR : Unknown Register\n";
                 return;
             }
             reg[ins.target] = reg[ins.source1] - reg[ins.source2];
@@ -187,6 +192,7 @@ void parse(){
         else if(ins.op == "mul"){
             if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() ){
                 flag = true;
+                print_msg = "ERROR : Unknown Register\n";
                 return;
             }
             reg[ins.target] = reg[ins.source1] * reg[ins.source2];
@@ -196,6 +202,7 @@ void parse(){
         else if(ins.op == "slt"){
             if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() ){
                 flag = true;
+                print_msg = "ERROR : Unknown Register\n";
                 return;
             }
             reg[ins.target] = reg[ins.source1] + reg[ins.source2];
@@ -207,6 +214,7 @@ void parse(){
         else if(ins.op == "beq"){
             if( reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() || label.find(ins.jump) == label.end()){
                 flag = true;
+                print_msg = "ERROR : Unknown Register\n";
                 return;
             }
             if(reg[ins.source1] == reg[ins.source2]){
@@ -218,6 +226,7 @@ void parse(){
         else if(ins.op == "bne"){
             if( reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() || label.find(ins.jump) == label.end()){
                 flag = true;
+                print_msg = "ERROR : Unknown Register\n";
                 return;
             }
             if(reg[ins.source1] != reg[ins.source2]){
@@ -230,33 +239,60 @@ void parse(){
             if( label.find(ins.jump) == reg.end()){
                 // print_ins(ins);
                 flag = true;
+                print_msg = "ERROR : Unknown Register\n";
                 return;
             }
             i = label[ins.jump];
         }
 
         else if(ins.op == "lw"){
-
+            if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || !is_number(ins.offset)){
+                flag = true;
+                print_msg = "ERROR : Unknown Register\n";
+                return;
+            }
+            int x = stoi(ins.offset) + reg[ins.source1];
+            if(x<memory.size())reg[ins.target] = memory[x];
+            else {
+                flag = true;
+                print_msg = "ERROR : Overflow\n";
+                return;
+            }
+            i++;
         }
 
         else if(ins.op == "sw"){
-
+            if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || !is_number(ins.offset)){
+                flag = true;
+                print_msg = "ERROR : Unknown Register\n";
+                return;
+            }
+            int x = stoi(ins.offset) + reg[ins.source1];
+            if(x<memory.size())memory[x] = reg[ins.target];
+            else {
+                flag = true;
+                print_msg = "ERROR : Overflow\n";
+                return;
+            }
+            i++;
         }
 
         else if(ins.op == "addi"){
             if( reg.find(ins.target) == reg.end()){
                 flag = true;
+                print_msg = "ERROR : Unknown Register\n";
                 return;
             }
             int x = 0, y = 0;
             // cout << ins.source1 << " " << ins.source2 << endl;
             if(ins.source1[0] == '$' && reg.find(ins.source1) == reg.end()){
                 flag = true;
+                print_msg = "ERROR : Unknown Register\n";
                 return;
             }            
             else if(ins.source1[0]!='$'){
                 flag = !is_number(ins.source1);
-                if(flag)return;
+                if(flag){print_msg = "ERROR : Not a number\n"; return;}
                 x = stoi(ins.source1);
             }
             else{  // First symbol is $ and is present in Register file
@@ -265,11 +301,12 @@ void parse(){
             // cout << ins.source1 << " " << ins.source2 << endl;
             if(ins.source2[0] == '$' && reg.find(ins.source2) == reg.end()){
                 flag = true;
+                print_msg = "ERROR : Unknown Register\n";
                 return;
             }            
             else if(ins.source2[0]!='$'){
                 flag = !is_number(ins.source2);
-                if(flag)return;
+                if(flag){print_msg = "ERROR : Not a number\n"; return;}                
                 y = stoi(ins.source2);
             }
             else{  // First symbol is $ and is present in Register file
@@ -282,10 +319,11 @@ void parse(){
             i++;
         }
         
-        if(ins.op!="")
+        if(ins.op!="" && print_count <=5)
         {
-            cout << "Instruction Number : " << print_count << endl;
+            cout << "Instruction : " << ins.original << endl;
             print_reg();
+            // print_ins(ins);
             print_count++;
         }
 
@@ -304,6 +342,15 @@ void InstructionCount(){
     instr_count.assign(instr.size(),0);
 }
 
+void AllotMemory(){
+    if(instr.size() <= TotalMemory)memory.resize(TotalMemory - instr.size());
+    else {
+        print_msg = "ERROR : Overflow\n";
+        flag = true;
+        return;
+    }
+}
+
 int main(int argc, char * argv[]){
     if(argc  ==  2){
         ifstream infile(argv[1]);
@@ -315,15 +362,23 @@ int main(int argc, char * argv[]){
                 text_file.push_back(line);
                 tokenize(line);
                 if(flag){
-                    cout << "ERROR in Line Number: " << ln << ": "<< line << endl;
+                    cout << print_msg;
+                    cout << "Line Number: " << ln << ": "<< line << endl;
                     return -1;
                 }
                 ln++;
             }
+            AllotMemory();
+            
+            if(flag){
+                cout << print_msg;
+                return -1;
+            }
+
             parse();
 
             if(flag){
-                cout << "Unknown Register or Function name\n";
+                cout << print_msg;
 
                 // for(auto i=label.begin(); i!=label.end();i++){
                 //     cout << "->" << i->first << "<-->" << i->second <<"<-\n"; 
@@ -335,9 +390,14 @@ int main(int argc, char * argv[]){
                 cout << "================================\n";
                 cout << "Program Execeuted Successfully\n";
                 cout << "================================\n";
+                cout << "Program Statistics\n";
+                cout << "Clock cycles : " << print_count-1 << endl;
+                cout << "Instruction Execution Count:\n";
+                int j = 1;
                 for(int i=0;i<instr.size();i++){
                     if(instr[i].original!=""){
-                        cout << instr[i].original << " : "  << instr[i].InstructionCount <<  "\n";
+                        cout << j << ". " << instr[i].original << " : "  << instr[i].InstructionCount <<  "\n";
+                        j++;
                     }
                 }
             }
