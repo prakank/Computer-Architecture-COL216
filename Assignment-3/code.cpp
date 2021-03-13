@@ -3,17 +3,18 @@
 #include<vector>
 #include<string>
 #include<map>
+#include<sstream>
 #include <boost/algorithm/string.hpp>
 
 using namespace std;
-#define ll long long
-typedef vector<ll> vi; 
 vector<int> instr_count;
 map<string,int> reg,label;
 bool flag = false;
 string print_msg = "";
 vector<int> memory;
 int TotalMemory = 262144;
+int print_count = 1;
+int ErrorLine = -1;
 
 struct instruction{
     string op="",target="",source1="",source2="";
@@ -37,6 +38,61 @@ string strip(string s){
     while(end >= 0 && s[end] == ' ' || s[end] == '\t')end--;
     string s_new = s.substr(start,end-start+1);
     return s_new;
+}
+
+bool is_number(const string& s)
+{
+    string::const_iterator it = s.begin();
+    if(*it=='-')it++;
+    while (it != s.end() && isdigit(*it)) ++it;
+    return !s.empty() && it == s.end();
+}
+
+void std_registers(){
+    reg["$t0"]=0;reg["$t1"]=0;reg["$t2"]=0;reg["$t3"]=0;reg["$t4"]=0;reg["$t5"]=0;reg["$t6"]=0;reg["$t7"]=0;reg["$t8"]=0;reg["$t9"]=0;
+    reg["$s0"]=0;reg["$s1"]=0;reg["$s2"]=0;reg["$s3"]=0;reg["$s4"]=0;reg["$s5"]=0;reg["$s6"]=0;reg["$s7"]=0;reg["$s8"]=0;reg["$s9"]=0;
+    reg["$r0"]=0;reg["$r1"]=0;reg["$r2"]=0;reg["$r3"]=0;reg["$r4"]=0;reg["$r5"]=0;reg["$r6"]=0;reg["$r7"]=0;reg["$r8"]=0;reg["$r9"]=0;
+    reg["$v0"]=0;reg["$zero"]=0;
+}
+
+void print_reg(){
+    int cnt = 0;
+    for (auto i = reg.begin(); i != reg.end(); i++){
+        stringstream ss;
+        ss << hex << i->second;
+        string res(ss.str());
+        cout << i->first << ":" << res;
+        cnt++;
+        if(cnt%10==0 || cnt==32)cout<<"\n";
+        else cout<<", ";
+    }
+    cout <<"\n";
+}
+
+void print_ins(instruction ins){
+    cout << "Op : ->" << ins.op << "<-\n";
+    cout << "Tar : ->" << ins.target << "<-\n";
+    cout << "Sou1 : ->" << ins.source1 << "<-\n";
+    cout << "Sou2 : ->" << ins.source2 << "<-\n";
+    cout << "Jump : ->" << ins.jump << "<-\n";
+    cout << "Jump_index : ->" << label[ins.jump] << "<-\n";
+    cout << "Off : ->" << ins.offset << "<-\n";
+    cout << "Fun_lable : ->" << ins.fun_label << "<-\n\n";
+}
+
+void print_map(map<string,int> m){
+    for(auto i=m.begin(); i!=m.end();i++){
+        cout << "->" << i->first << "<-->" << i->second <<"<-\n"; 
+    }
+}  
+
+void AllotMemory(){
+    if(instr.size() <= TotalMemory)memory.resize(TotalMemory - instr.size());
+    else {
+        print_msg = "ERROR : Overflow\n";
+        flag = true;
+        return;
+    }
 }
 
 void tokenize(string s){
@@ -128,51 +184,23 @@ void tokenize(string s){
     instr.push_back(ins);
 }
 
-bool is_number(const string& s)
-{
-    string::const_iterator it = s.begin();
-    if(*it=='-')it++;
-    while (it != s.end() && isdigit(*it)) ++it;
-    return !s.empty() && it == s.end();
-}
-
-void print_reg(){
-    int cnt = 0;
-    for (auto i = reg.begin(); i != reg.end(); i++){
-        cout << i->first << ":" << i->second;
-        cnt++;
-        if(cnt%10==0 || cnt==32)cout<<"\n";
-        else cout<<", ";
-    }
-    cout <<"\n";
-}
-
-
-void print_ins(instruction ins){
-    cout << "Op : ->" << ins.op << "<-\n";
-    cout << "Tar : ->" << ins.target << "<-\n";
-    cout << "Sou1 : ->" << ins.source1 << "<-\n";
-    cout << "Sou2 : ->" << ins.source2 << "<-\n";
-    cout << "Jump : ->" << ins.jump << "<-\n";
-    cout << "Jump_index : ->" << label[ins.jump] << "<-\n";
-    cout << "Off : ->" << ins.offset << "<-\n";
-    cout << "Fun_lable : ->" << ins.fun_label << "<-\n\n";
-}
-
-int print_count = 1;
-
-
 void parse(){
     int i = 0;
     while(i<instr.size()){
         instruction ins = instr[i];
         instr[i].InstructionCount++;
+        ErrorLine = i;
         // print_ins(ins);
 
         if(ins.op == "add"){
             if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() ){
                 print_msg = "ERROR : Unknown Register\n";
                 flag = true;
+                return;
+            }
+            if(ins.target == "$0" || ins.target == "$zero"){
+                print_msg = "ERROR : Trying to change Const value\n";
+                flag =true;
                 return;
             }
             reg[ins.target] = reg[ins.source1] + reg[ins.source2];
@@ -185,6 +213,11 @@ void parse(){
                 print_msg = "ERROR : Unknown Register\n";
                 return;
             }
+            if(ins.target == "$0" || ins.target == "$zero"){
+                print_msg = "ERROR : Trying to change Const value\n";
+                flag =true;
+                return;
+            }
             reg[ins.target] = reg[ins.source1] - reg[ins.source2];
             i++;
         }
@@ -193,6 +226,11 @@ void parse(){
             if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() ){
                 flag = true;
                 print_msg = "ERROR : Unknown Register\n";
+                return;
+            }
+            if(ins.target == "$0" || ins.target == "$zero"){
+                print_msg = "ERROR : Trying to change Const value\n";
+                flag =true;
                 return;
             }
             reg[ins.target] = reg[ins.source1] * reg[ins.source2];
@@ -205,6 +243,11 @@ void parse(){
                 print_msg = "ERROR : Unknown Register\n";
                 return;
             }
+            if(ins.target == "$0" || ins.target == "$zero"){
+                print_msg = "ERROR : Trying to change Const value\n";
+                flag =true;
+                return;
+            }
             reg[ins.target] = reg[ins.source1] + reg[ins.source2];
             if(reg[ins.source1] < reg[ins.source2])reg[ins.target] = 1;
             else reg[ins.target] = 0;
@@ -212,9 +255,14 @@ void parse(){
         }
 
         else if(ins.op == "beq"){
-            if( reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() || label.find(ins.jump) == label.end()){
+            if( reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end()){
                 flag = true;
                 print_msg = "ERROR : Unknown Register\n";
+                return;
+            }
+            if(label.find(ins.jump) == label.end()){
+                flag = true;
+                print_msg = "ERROR : Unknown Function\n";
                 return;
             }
             if(reg[ins.source1] == reg[ins.source2]){
@@ -224,9 +272,14 @@ void parse(){
         }
 
         else if(ins.op == "bne"){
-            if( reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() || label.find(ins.jump) == label.end()){
+            if( reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end()){
                 flag = true;
                 print_msg = "ERROR : Unknown Register\n";
+                return;
+            }
+            if(label.find(ins.jump) == label.end()){
+                flag = true;
+                print_msg = "ERROR : Unknown Function\n";
                 return;
             }
             if(reg[ins.source1] != reg[ins.source2]){
@@ -236,10 +289,10 @@ void parse(){
         }
 
         else if(ins.op == "j"){
-            if( label.find(ins.jump) == reg.end()){
+            if( label.find(ins.jump) == label.end()){
                 // print_ins(ins);
                 flag = true;
-                print_msg = "ERROR : Unknown Register\n";
+                print_msg = "ERROR : Unknown Function\n";
                 return;
             }
             i = label[ins.jump];
@@ -283,6 +336,11 @@ void parse(){
                 print_msg = "ERROR : Unknown Register\n";
                 return;
             }
+            if(ins.target == "$0" || ins.target == "$zero"){
+                print_msg = "ERROR : Trying to change Const value\n";
+                flag =true;
+                return;
+            }
             int x = 0, y = 0;
             // cout << ins.source1 << " " << ins.source2 << endl;
             if(ins.source1[0] == '$' && reg.find(ins.source1) == reg.end()){
@@ -319,7 +377,7 @@ void parse(){
             i++;
         }
         
-        if(ins.op!="" && print_count <=5)
+        if(ins.op!="")
         {
             cout << "Instruction : " << ins.original << endl;
             print_reg();
@@ -328,26 +386,6 @@ void parse(){
         }
 
 
-    }
-}
-
-void std_registers(){
-    reg["$t0"]=0;reg["$t1"]=0;reg["$t2"]=0;reg["$t3"]=0;reg["$t4"]=0;reg["$t5"]=0;reg["$t6"]=0;reg["$t7"]=0;reg["$t8"]=0;reg["$t9"]=0;
-    reg["$s0"]=0;reg["$s1"]=0;reg["$s2"]=0;reg["$s3"]=0;reg["$s4"]=0;reg["$s5"]=0;reg["$s6"]=0;reg["$s7"]=0;reg["$s8"]=0;reg["$s9"]=0;
-    reg["$r0"]=0;reg["$r1"]=0;reg["$r2"]=0;reg["$r3"]=0;reg["$r4"]=0;reg["$r5"]=0;reg["$r6"]=0;reg["$r7"]=0;reg["$r8"]=0;reg["$r9"]=0;
-    reg["$v0"]=0;reg["$v1"]=0;
-}
-
-void InstructionCount(){
-    instr_count.assign(instr.size(),0);
-}
-
-void AllotMemory(){
-    if(instr.size() <= TotalMemory)memory.resize(TotalMemory - instr.size());
-    else {
-        print_msg = "ERROR : Overflow\n";
-        flag = true;
-        return;
     }
 }
 
@@ -368,22 +406,19 @@ int main(int argc, char * argv[]){
                 }
                 ln++;
             }
+            
+            if(ln==1){cout << "Empty File\n";return 0;}
+
             AllotMemory();
             
-            if(flag){
-                cout << print_msg;
-                return -1;
-            }
+            if(flag){cout << print_msg;return -1;}
 
             parse();
 
             if(flag){
                 cout << print_msg;
-
-                // for(auto i=label.begin(); i!=label.end();i++){
-                //     cout << "->" << i->first << "<-->" << i->second <<"<-\n"; 
-                // }
-
+                cout << "Line Number: " << ErrorLine << ": "<< instr[ErrorLine].original << endl;
+                // print_map(label);
                 return -1;
             }
             else{

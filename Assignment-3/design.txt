@@ -1,0 +1,153 @@
+Prakhar Aggarwal
+2019CS50441
+
+
+Design Overview:
+
+
+1.) I have taken registers as, $t0-$t10, $s0-$s10, $r0-$r10, $v0 and $zero making it a total of 32 registers.
+
+2.) At first, I have tokenized a line and did this for all the instructions. Once the tokenization is over, Execution of instructions starts.
+
+3.) All instructions are read and stored in memory. 
+
+4.) Errors in input file (if any) are detected during instruction reading.
+
+5.) Errors like unknown function name are detected while executing the instructions.
+
+6.) Max. Memory size taken is 2^20 bytes. Instructions and program data are stored in this memory.
+
+7.) Overflow error is reported in case user tries to access the memory beyond 2^20 - MemoryAllocatedToInstructions.
+
+8.) I have converted all the labels of the form 
+    main : <op> <tar>,<src1>,<src2> 
+    to 
+    main:
+        <op> <tar>,<src1>,<src2>
+    
+9.) On completion of program, Program statistics such as Number of clock cyles and Number of times each instruction was executed are printed.
+
+
+Approach : 
+
+
+1.) Structure "instruction" is used to store all the details such as target register, source register1, source register2, Operation name.
+
+2.) Function "strip" is used to remove whitespaces occuring at the start and end of a word. 
+
+3.) Function "is_number" is used to check whether a string can be converted to an integer or not. 
+
+4.) All registers are initialized with value 0 via the function "std_registers".
+
+5.) Appropriate print functions are defined to print the value of registers after each instruction, to check how an instruction is stored. 
+
+6.) MIPS input file is read line by line, and each line is tokenized and then stored in a vector.
+
+7.) While loop is used which reads instructions stored in the above vector and takes appropriate decisions i.e. whether to go to next instruction or whether to jump to some label by executing the type of current operation.
+
+8.) Loop terminates on reaching the end of the vector i.e. when no more instructions are left to be executed.
+
+9.) Errors (if any) are flagged during the tokenization step (such as "Too many Arguments") and during the Execution step (such as "Unknown Function").
+
+10.) "Loop" and "loop" are assumed to be 2 different function names. 
+
+11.) I have assumed addi $t0, 3, 4 to be a correct instruction
+
+12.) For an instruction like "lw $t0,8($t1)", value at address (8 + value at $t1) is stored in $t0 and not at ( ( 8/4 = 2) + value at $t1)
+
+13.) Each instruction takes 1 clock cycle.
+
+14.) The code is divide into multiple blocks to facilitate branching statements, while loops, as well as to enhance readability of code.
+
+Testcases : 
+
+Input file provided is read line by line and output is printed on the console. 
+
+Case 1: (Empty File)
+    Input File: 
+    Output: Empty File
+
+Case 2:
+
+    Input File : 
+                main:
+                    addi $t0,$t0,1
+                loop:
+                    addi $t1, $t1,1
+                    bne $t1,$t0,loop
+
+    Output:
+
+                Instruction : addi $t0,$t0,1
+                $r0:0, $r1:0, $r2:0, $r3:0, $r4:0, $r5:0, $r6:0, $r7:0, $r8:0, $r9:0
+                $s0:0, $s1:0, $s2:0, $s3:0, $s4:0, $s5:0, $s6:0, $s7:0, $s8:0, $s9:0
+                $t0:1, $t1:0, $t2:0, $t3:0, $t4:0, $t5:0, $t6:0, $t7:0, $t8:0, $t9:0
+                $v0:0, $zero:0
+
+                Instruction : addi $t1, $t1,1
+                $r0:0, $r1:0, $r2:0, $r3:0, $r4:0, $r5:0, $r6:0, $r7:0, $r8:0, $r9:0
+                $s0:0, $s1:0, $s2:0, $s3:0, $s4:0, $s5:0, $s6:0, $s7:0, $s8:0, $s9:0
+                $t0:1, $t1:1, $t2:0, $t3:0, $t4:0, $t5:0, $t6:0, $t7:0, $t8:0, $t9:0
+                $v0:0, $zero:0
+
+                Instruction : bne $t1,$t0,loop
+                $r0:0, $r1:0, $r2:0, $r3:0, $r4:0, $r5:0, $r6:0, $r7:0, $r8:0, $r9:0
+                $s0:0, $s1:0, $s2:0, $s3:0, $s4:0, $s5:0, $s6:0, $s7:0, $s8:0, $s9:0
+                $t0:1, $t1:1, $t2:0, $t3:0, $t4:0, $t5:0, $t6:0, $t7:0, $t8:0, $t9:0
+                $v0:0, $zero:0
+
+                ================================
+                Program Execeuted Successfully
+                ================================
+                Program Statistics
+                Clock cycles : 3
+                Instruction Execution Count:
+                1. addi $t0,$t0,1 : 1
+                2. addi $t1, $t1,1 : 1
+                3. bne $t1,$t0,loop : 1
+
+
+Case 2:
+    Input File : 
+                main:
+                    addi $t0,$t0,1
+                loop:
+                    addi $t1, $t1,1
+                    bne $t1,$t0,Loop
+    
+    Output File: 
+                Instruction : addi $t0,$t0,1
+                $r0:0, $r1:0, $r2:0, $r3:0, $r4:0, $r5:0, $r6:0, $r7:0, $r8:0, $r9:0
+                $s0:0, $s1:0, $s2:0, $s3:0, $s4:0, $s5:0, $s6:0, $s7:0, $s8:0, $s9:0
+                $t0:1, $t1:0, $t2:0, $t3:0, $t4:0, $t5:0, $t6:0, $t7:0, $t8:0, $t9:0
+                $v0:0, $zero:0
+
+                Instruction : addi $t1, $t1,1
+                $r0:0, $r1:0, $r2:0, $r3:0, $r4:0, $r5:0, $r6:0, $r7:0, $r8:0, $r9:0
+                $s0:0, $s1:0, $s2:0, $s3:0, $s4:0, $s5:0, $s6:0, $s7:0, $s8:0, $s9:0
+                $t0:1, $t1:1, $t2:0, $t3:0, $t4:0, $t5:0, $t6:0, $t7:0, $t8:0, $t9:0
+                $v0:0, $zero:0
+
+                ERROR : Unknown Function
+
+
+Case 3: 
+    Input File: 
+                main: lw $t1,4(0)
+    Output File: 
+                ERROR : Unknown Register
+
+
+Case 4:
+    Input File: 
+                addi $t0,$t0,4
+                addi $t0,$t12,2                 
+    Output File:
+                Instruction : addi $t0,$t0,4
+                $r0:0, $r1:0, $r2:0, $r3:0, $r4:0, $r5:0, $r6:0, $r7:0, $r8:0, $r9:0
+                $s0:0, $s1:0, $s2:0, $s3:0, $s4:0, $s5:0, $s6:0, $s7:0, $s8:0, $s9:0
+                $t0:4, $t1:0, $t2:0, $t3:0, $t4:0, $t5:0, $t6:0, $t7:0, $t8:0, $t9:0
+                $v0:0, $zero:0
+
+                ERROR : Unknown Register
+                Line Number: 1: addi $t0,$t12,2
