@@ -3,12 +3,14 @@
 #include<vector>
 #include<string>
 #include<map>
+#include<queue>
 #include<sstream>
 #include <boost/algorithm/string.hpp>
+#define max3(x,y,z) max(max(x,y),z)
 
 using namespace std;
 vector<int> instr_count;
-map<string,int> reg,label;
+map<string,int> reg,label,Active;
 bool flag = false;
 string print_msg = "";
 // vector<int> memory;
@@ -21,10 +23,10 @@ int ColumnMemory = 1024;
 int RowBuffer = -1;                         // Assumption - We have only 1 Row Buffer (otherwise, we could have used an array)
 int TotalMemory = TotalMemory_4Bytes/4;
 int MemoryAvailable;
-int print_count = 1;
+int Counter = 1;
 int ErrorLine = -1;
 int NumberOfCycles = 0;
-
+bool Completed = false;
 
 struct instruction{
     string op="",target="",source1="",source2="";
@@ -33,9 +35,10 @@ struct instruction{
     string fun_label="";
     string original = "";
     int InstructionCount = 0;
+    int EndTime = -1;
 };
 
-vector<instruction> instr;
+vector<instruction> instr, QueueInstructions;
 
 // First job is to parse over the file and store the instructions in instruction memory 
 
@@ -48,6 +51,10 @@ string strip(string s){
     while(end >= 0 && s[end] == ' ' || s[end] == '\t')end--;
     string s_new = s.substr(start,end-start+1);
     return s_new;
+}
+
+bool Comparator(instruction a, instruction b){
+    return a.EndTime <= b.EndTime;
 }
 
 bool is_number(const string& s)
@@ -68,6 +75,8 @@ void std_registers(){
     // reg["$r10"]=0;reg["$r11"]=0;reg["$r12"]=0;reg["$r13"]=0;reg["$r14"]=0;reg["$r15"]=0;reg["$r16"]=0;reg["$r17"]=0;reg["$r18"]=0;reg["$r19"]=0;
     // reg["$r20"]=0;reg["$r21"]=0;reg["$r22"]=0;reg["$r23"]=0;reg["$r24"]=0;reg["$r25"]=0;reg["$r26"]=0;reg["$r27"]=0;reg["$r28"]=0;reg["$r29"]=0;
     // reg["$r30"]=0;reg["$zero"]=0;
+
+    for(auto i = reg.begin(); i != reg.end(); i++)Active[i->first] = 0;
 
 }
 
@@ -207,6 +216,7 @@ void tokenize(string s){
 void parse(){
     int i = 0;
     while(i<instr.size()){
+        Completed = false;
         instruction ins = instr[i];
         instr[i].InstructionCount++;
         ErrorLine = i;
@@ -224,12 +234,22 @@ void parse(){
                 flag =true;
                 return;
             }
-            if(ins.op == "add")reg[ins.target] = reg[ins.source1] + reg[ins.source2];
-            if(ins.op == "sub")reg[ins.target] = reg[ins.source1] - reg[ins.source2];
-            if(ins.op == "mul")reg[ins.target] = reg[ins.source1] * reg[ins.source2];
-            if(ins.op == "slt"){
-                if(reg[ins.source1] < reg[ins.source2])reg[ins.target] = 1;
-                else reg[ins.target] = 0;
+
+            if(Active[ins.target] > NumberOfCycles || Active[ins.source1] > NumberOfCycles || Active[ins.source2] > NumberOfCycles ){
+                ins.EndTime = max3(Active[ins.target], Active[ins.source1], Active[ins.source2]) + 1;
+                Active[ins.target] = Active[ins.source1] = Active[ins.source2] = ins.EndTime;
+                QueueInstructions.push_back(ins);             
+                sort(QueueInstructions.begin(), QueueInstructions.end(), Comparator);
+            }
+            else{
+                if(ins.op == "add")reg[ins.target] = reg[ins.source1] + reg[ins.source2];
+                if(ins.op == "sub")reg[ins.target] = reg[ins.source1] - reg[ins.source2];
+                if(ins.op == "mul")reg[ins.target] = reg[ins.source1] * reg[ins.source2];
+                if(ins.op == "slt"){
+                    if(reg[ins.source1] < reg[ins.source2])reg[ins.target] = 1;
+                    else reg[ins.target] = 0;
+                }
+                Completed = true;
             }
             i++;
             NumberOfCycles++;
@@ -269,6 +289,7 @@ void parse(){
         }
 
         else if(ins.op == "lw" || ins.op == "sw"){
+            int AvailabilityTime = 0;
             if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || !is_number(ins.offset)){
                 flag = true;
                 print_msg = "ERROR : Unknown Register\n";
@@ -276,7 +297,7 @@ void parse(){
             }
             int x = stoi(ins.offset) + reg[ins.source1];           
 
-            if(x < MemoryAvailable && x%4!=0){
+            if(x < MemoryAvailable && x%4!=0){    // I have assumed offset to be a multiple of 4 else raised Error. 
                 flag = true;
                 print_msg = "ERROR : Offset should be a multiple of 4\n";
                 return;
@@ -284,6 +305,15 @@ void parse(){
 
             if(x < MemoryAvailable){
                 
+                if( Active[ins.target] > NumberOfCycles || Active[ins.source1] > NumberOfCycles){
+                    AvailabilityTime = max(Active[ins.target],Active[ins.source1]);
+                    // ins.EndTime++;
+                    Active[ins.target] = Active[ins.source1] = ins.EndTime;
+                }
+                else{
+
+                }
+
                 NumberOfCycles++; // Will take 1 cycle to read instruciton.
                 int RowNumber = (int)x/ColumnMemory;
                 int ColumnNumber = x - (RowNumber*ColumnMemory);
@@ -310,6 +340,9 @@ void parse(){
         }
 
         else if(ins.op == "addi"){
+            int CheckForAvailability = 0;
+            int AvailabilityTime = 0;
+            int p1=0,p2=0;
             if( reg.find(ins.target) == reg.end()){
                 flag = true;
                 print_msg = "ERROR : Unknown Register\n";
@@ -334,6 +367,8 @@ void parse(){
             }
             else{  // First symbol is $ and is present in Register file
                 x = reg[ins.source1];
+                p1=1;                  // To ensure that Active[ins.source] exists and doesn't end up in error
+                if(Active[ins.source1] > NumberOfCycles) {CheckForAvailability++; AvailabilityTime = max(AvailabilityTime, Active[ins.source1]); }
             }
             // cout << ins.source1 << " " << ins.source2 << endl;
             if(ins.source2[0] == '$' && reg.find(ins.source2) == reg.end()){
@@ -348,8 +383,21 @@ void parse(){
             }
             else{  // First symbol is $ and is present in Register file
                 y = reg[ins.source2];
+                p2=1;
+                if(Active[ins.source2] > NumberOfCycles) {CheckForAvailability++; AvailabilityTime = max(AvailabilityTime, Active[ins.source2]); }
             }
-            reg[ins.target] = x+y;
+            if(Active[ins.target] > NumberOfCycles) {CheckForAvailability++; AvailabilityTime = max(AvailabilityTime, Active[ins.target]); }
+
+            if(CheckForAvailability > 0){
+                AvailabilityTime++;
+                ins.EndTime = AvailabilityTime;
+                if(p1==1)Active[ins.source1] = AvailabilityTime;
+                if(p2==1)Active[ins.source2] = AvailabilityTime;
+                Active[ins.target] = AvailabilityTime;
+                QueueInstructions.push_back(ins);
+                sort(QueueInstructions.begin(), QueueInstructions.end(), Comparator);
+            }            
+            else {reg[ins.target] = x+y; Completed = true;}
             i++;
             NumberOfCycles++;
         }
@@ -360,7 +408,7 @@ void parse(){
             cout << "Instruction : " << ins.original << endl;
             print_reg();
             // print_ins(ins);
-            print_count++;
+            Counter++;
         }
 
 
@@ -409,7 +457,7 @@ int main(int argc, char * argv[]){
                 cout << "================================\n";
                 cout << "Program Statistics\n";
                 cout << "Clock cycles : " << NumberOfCycles << endl;
-                cout << "Instruction Count : " << print_count - 1 << endl;
+                cout << "Instruction Count : " << Counter - 1 << endl;
                 cout << "Instruction Execution Count:\n";
                 int j = 1;
                 for(int i=0;i<instr.size();i++){
