@@ -2,13 +2,15 @@
 #include<fstream>
 #include<vector>
 #include<string>
+#include<iomanip>
 #include<map>
 #include<sstream>
-#include <boost/algorithm/string.hpp>
+#include<boost/algorithm/string.hpp>
+#include<boost/format.hpp> 
 
 using namespace std;
 vector<int> instr_count;
-map<string,int> reg,label;
+map<string,int> reg,label,Active;
 bool flag = false;
 string print_msg = "";
 // vector<int> memory;
@@ -24,7 +26,20 @@ int MemoryAvailable;
 int print_count = 1;
 int ErrorLine = -1;
 int NumberOfCycles = 0;
+int StartTime = -1;
+int EndTime = -1;
+bool Working = false;
+bool SameRow = false;
 
+// vector<string> CommandCounter;
+// vector<pair<int,int>> ClockCounter;
+
+struct PrintCommand{
+    int Start = -1;
+    int End = -1;
+    string Command = "";
+    string Execution = "";
+};
 
 struct instruction{
     string op="",target="",source1="",source2="";
@@ -33,9 +48,11 @@ struct instruction{
     string fun_label="";
     string original = "";
     int InstructionCount = 0;
+    int row = -1;
 };
 
 vector<instruction> instr;
+vector<PrintCommand> Command;
 
 // First job is to parse over the file and store the instructions in instruction memory 
 
@@ -48,6 +65,11 @@ string strip(string s){
     while(end >= 0 && s[end] == ' ' || s[end] == '\t')end--;
     string s_new = s.substr(start,end-start+1);
     return s_new;
+}
+
+bool Comparator(PrintCommand a, PrintCommand b){
+    if(a.End!=b.End)return a.End < b.End;
+    return a.Start > b.Start;
 }
 
 bool is_number(const string& s)
@@ -68,6 +90,8 @@ void std_registers(){
     // reg["$r10"]=0;reg["$r11"]=0;reg["$r12"]=0;reg["$r13"]=0;reg["$r14"]=0;reg["$r15"]=0;reg["$r16"]=0;reg["$r17"]=0;reg["$r18"]=0;reg["$r19"]=0;
     // reg["$r20"]=0;reg["$r21"]=0;reg["$r22"]=0;reg["$r23"]=0;reg["$r24"]=0;reg["$r25"]=0;reg["$r26"]=0;reg["$r27"]=0;reg["$r28"]=0;reg["$r29"]=0;
     // reg["$r30"]=0;reg["$zero"]=0;
+
+    for(auto i = reg.begin(); i != reg.end(); i++)Active[i->first] = 0;
 
 }
 
@@ -104,6 +128,25 @@ void print_map(map<string,int> m){
     }
 }  
 
+void print_command_debug(PrintCommand pc){
+    cout << "Start : ->" << pc.Start << "<-\n";
+    cout << "End : ->" << pc.End << "<-\n";
+    cout << "Command : ->" << pc.Command << "<-\n\n";
+}
+
+void print_command(PrintCommand pc){
+    string s = "Cycle ";
+    if(pc.Start == pc.End){
+        s += to_string(pc.Start);
+        s += ":";
+    }
+    else{
+        s += to_string(pc.Start) + "-" + to_string(pc.End);
+        s += ":";
+    }
+    cout << boost::format("%-20s %-35s %-50s\n") % s % pc.Command % pc.Execution;
+}
+
 void AllotMemory(){
     if(instr.size() <= TotalMemory){
         // memory.resize(TotalMemory - instr.size());
@@ -112,6 +155,7 @@ void AllotMemory(){
         for(int i=0;i<RowMemory;i++){
             Dram[i].resize(ColumnMemory);
         }
+
     }
     else {
         print_msg = "ERROR : Overflow\n";
@@ -213,7 +257,7 @@ void parse(){
 
         // print_ins(ins);
         
-        if(ins.op == "add" || ins.op == "mul" || ins.op == "sub" || ins.op == "slt"){
+        if(ins.op == "add"){
             if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end() ){
                 print_msg = "ERROR : Unknown Register\n";
                 flag = true;
@@ -224,48 +268,24 @@ void parse(){
                 flag =true;
                 return;
             }
-            if(ins.op == "add")reg[ins.target] = reg[ins.source1] + reg[ins.source2];
-            if(ins.op == "sub")reg[ins.target] = reg[ins.source1] - reg[ins.source2];
-            if(ins.op == "mul")reg[ins.target] = reg[ins.source1] * reg[ins.source2];
-            if(ins.op == "slt"){
-                if(reg[ins.source1] < reg[ins.source2])reg[ins.target] = 1;
-                else reg[ins.target] = 0;
-            }
-            i++;
-            NumberOfCycles++;
-        }
-
-        else if(ins.op == "beq" || ins.op == "bne"){
-            if( reg.find(ins.source1) == reg.end() || reg.find(ins.source2) == reg.end()){
-                flag = true;
-                print_msg = "ERROR : Unknown Register\n";
-                return;
-            }
-            if(label.find(ins.jump) == label.end()){
-                flag = true;
-                print_msg = "ERROR : Unknown Function\n";
-                return;
-            }
-            if(ins.op == "beq"){
-                if(reg[ins.source1] == reg[ins.source2])i = label[ins.jump];
-                else i++;
+            if(Active[ins.target] > NumberOfCycles || Active[ins.source1] > NumberOfCycles || Active[ins.source2] > NumberOfCycles){
+                NumberOfCycles = EndTime;
+                continue;
             }
             else{
-                if(reg[ins.source1] != reg[ins.source2])i = label[ins.jump];
-                else i++;
+                PrintCommand pr;
+                pr.Start = NumberOfCycles + 1;
+                pr.End = pr.Start;
+                pr.Command = ins.original;                
+                reg[ins.target] = reg[ins.source1] + reg[ins.source2];      
+                pr.Execution = ins.target + " = " + to_string(reg[ins.target]);
+                Command.push_back(pr);
+                i++;
+                NumberOfCycles++;
+                // ClockCounter.push_back(make_pair(NumberOfCycles+1, NumberOfCycles+1));
+                // CommandCounter.push_back(ins.original);
             }
-            NumberOfCycles++;
-        }
-
-        else if(ins.op == "j"){
-            if( label.find(ins.jump) == label.end()){
-                // print_ins(ins);
-                flag = true;
-                print_msg = "ERROR : Unknown Function\n";
-                return;
-            }
-            i = label[ins.jump];
-            NumberOfCycles++;
+            
         }
 
         else if(ins.op == "lw" || ins.op == "sw"){
@@ -274,8 +294,10 @@ void parse(){
                 print_msg = "ERROR : Unknown Register\n";
                 return;
             }
-            int x = stoi(ins.offset) + reg[ins.source1];           
-
+            int x = stoi(ins.offset) + reg[ins.source1];    
+            int RowNumber = (int)x/ColumnMemory;
+            int ColumnNumber = x - (RowNumber*ColumnMemory);       
+            ins.row = RowNumber;
             if(x < MemoryAvailable && x%4!=0){
                 flag = true;
                 print_msg = "ERROR : Offset should be a multiple of 4\n";
@@ -284,21 +306,81 @@ void parse(){
 
             if(x < MemoryAvailable){
                 
-                NumberOfCycles++; // Will take 1 cycle to read instruciton.
-                int RowNumber = (int)x/ColumnMemory;
-                int ColumnNumber = x - (RowNumber*ColumnMemory);
-                
-                if(RowNumber != RowBuffer){
-                    // We have to wait for previous instruction (if any)
-                    if(RowBuffer == -1)NumberOfCycles += RowDelay;
-                    else NumberOfCycles += RowDelay*2;
+                if(EndTime <= NumberOfCycles){                    
+                    PrintCommand pr;
+                    pr.Start = pr.End = NumberOfCycles + 1;
+                    pr.Command = ins.original;
+                    Command.push_back(pr);
+
+                    if(RowBuffer == ins.row){
+                        pr.Start = NumberOfCycles + 2;
+                        pr.End = pr.Start + ColumnDelay - 1;
+                        pr.Command = "DRAM : Column Access";                        
+                        if(ins.op == "lw"){
+                            pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+                        }
+                        else{
+                            pr.Execution = "Address " + to_string(x) + " = " + to_string(reg[ins.target]);
+                        }
+                        Command.push_back(pr);
+                        // ClockCounter.push_back(make_pair(NumberOfCycles + 1,NumberOfCycles + ColumnDelay ));
+                        // CommandCounter.push_back("DRAM : Column Access");
+                        StartTime = NumberOfCycles+2;
+                        EndTime = NumberOfCycles + 1 + ColumnDelay;
+                    }
+
+                    else if(RowBuffer == -1){ // have to initiate the process
+                        StartTime = NumberOfCycles + 2;
+                        EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
+                        pr.Start = NumberOfCycles + 2;
+                        pr.End = pr.Start + RowDelay - 1;
+                        pr.Command = "DRAM: Activate row " + to_string(ins.row);
+                        Command.push_back(pr);
+                        pr.Start = pr.End + 1;
+                        pr.End = pr.Start + ColumnDelay -1;
+                        pr.Command = "DRAM : Column Access";
+                        if(ins.op == "lw"){
+                            pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+                        }
+                        else{
+                            pr.Execution = "Address " + to_string(x) + " = " + to_string(reg[ins.target]);
+                        }
+                        Command.push_back(pr);
+                        RowBuffer = ins.row;
+                    }
+
+                    else{
+                        StartTime = NumberOfCycles + 2;
+                        EndTime = NumberOfCycles + 1 + RowDelay*2 + ColumnDelay;
+                        pr.Start = NumberOfCycles + 2;
+                        pr.End = pr.Start + RowDelay - 1;
+                        pr.Command = "DRAM: Writeback row " + to_string(RowBuffer);
+                        Command.push_back(pr);
+                        pr.Start = pr.End + 1;
+                        pr.End = pr.Start + RowDelay - 1;
+                        pr.Command = "DRAM: Activate row " + to_string(ins.row);
+                        Command.push_back(pr);
+                        pr.Start = pr.End + 1;
+                        pr.End = pr.Start + ColumnDelay -1;
+                        pr.Command = "DRAM : Column Access";
+                        if(ins.op == "lw"){
+                            pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+                        }
+                        else{
+                            pr.Execution = "Address " + to_string(x) + " = " + to_string(reg[ins.target]);
+                        }
+                        Command.push_back(pr);           
+                        RowBuffer = ins.row;             
+                    }
+
+                    Active[ins.target] = Active[ins.source1] = EndTime;
+                    
+                    if(ins.op == "lw")reg[ins.target] = Dram[RowNumber][ColumnNumber];
+                    else Dram[RowNumber][ColumnNumber] = reg[ins.target];
+                    NumberOfCycles++; // Will take 1 cycle to read instruciton.
                 }
 
-                RowBuffer = RowNumber;
-                NumberOfCycles += 2;
-                
-                if(ins.op == "lw")reg[ins.target] = Dram[RowNumber][ColumnNumber];
-                else Dram[RowNumber][ColumnNumber] = reg[ins.target];
+                else {NumberOfCycles = EndTime; continue;}                            
             
             }
             else {
@@ -334,6 +416,10 @@ void parse(){
             }
             else{  // First symbol is $ and is present in Register file
                 x = reg[ins.source1];
+                if(Active[ins.source1] > NumberOfCycles){
+                    NumberOfCycles = EndTime;
+                    continue;
+                }
             }
             // cout << ins.source1 << " " << ins.source2 << endl;
             if(ins.source2[0] == '$' && reg.find(ins.source2) == reg.end()){
@@ -348,22 +434,37 @@ void parse(){
             }
             else{  // First symbol is $ and is present in Register file
                 y = reg[ins.source2];
+                if(Active[ins.source1] > NumberOfCycles){
+                    NumberOfCycles = EndTime;
+                    continue;
+                }
             }
+            // cout << "Hey  "  << ins.target << "  " <<  NumberOfCycles <<   "\n" ;
+            if(Active[ins.target] > NumberOfCycles){
+                // cout << "Hey  "  << ins.target << "  " <<  NumberOfCycles <<   "\n" ;
+                NumberOfCycles = EndTime;
+                continue;
+            }
+            PrintCommand pr;
+            pr.Start = NumberOfCycles + 1;
+            pr.End = pr.Start;
+            pr.Command = ins.original;
             reg[ins.target] = x+y;
+            pr.Execution = ins.target + " = " + to_string(reg[ins.target]);
+            Command.push_back(pr);
+            
             i++;
             NumberOfCycles++;
         }
         else i++; //  This is for the labels like "main:" which will not be covered in any if the cases above.  
 
-        if(ins.op!="")
-        {
-            cout << "Instruction : " << ins.original << endl;
-            print_reg();
-            // print_ins(ins);
-            print_count++;
-        }
-
-
+        // if(ins.op!="")
+        // {
+        //     cout << "Instruction : " << ins.original << endl;
+        //     print_reg();
+        //     // print_ins(ins);
+        //     print_count++;
+        // }
     }
 }
 
@@ -404,20 +505,27 @@ int main(int argc, char * argv[]){
                 return -1;
             }
             else{
-                cout << "================================\n";
-                cout << "Program Execeuted Successfully\n";
-                cout << "================================\n";
-                cout << "Program Statistics\n";
-                cout << "Clock cycles : " << NumberOfCycles << endl;
-                cout << "Instruction Count : " << print_count - 1 << endl;
-                cout << "Instruction Execution Count:\n";
-                int j = 1;
-                for(int i=0;i<instr.size();i++){
-                    if(instr[i].original!=""){
-                        cout << j << ". " << instr[i].original << " : "  << instr[i].InstructionCount <<  "\n";
-                        j++;
-                    }
+                
+                cout << boost::format("%-20s %-35s %-50s\n") % "Cycle Count" % "Instruction" % "Register";
+                sort(Command.begin(),Command.end(),Comparator);
+                for(int i=0;i<Command.size();++i){
+                    print_command(Command[i]);
                 }
+
+                // cout << "================================\n";
+                // cout << "Program Execeuted Successfully\n";
+                // cout << "================================\n";
+                // cout << "Program Statistics\n";
+                // cout << "Clock cycles : " << NumberOfCycles << endl;
+                // cout << "Instruction Count : " << print_count - 1 << endl;
+                // cout << "Instruction Execution Count:\n";
+                // int j = 1;
+                // for(int i=0;i<instr.size();i++){
+                //     if(instr[i].original!=""){
+                //         cout << j << ". " << instr[i].original << " : "  << instr[i].InstructionCount <<  "\n";
+                //         j++;
+                //     }
+                // }
             }
         }
         else cout << "File not found.\n";
