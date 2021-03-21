@@ -1,0 +1,36 @@
+PART 2
+
+ROW_ACCESS_DELAY: 10
+COLUMN_ACCESS_DELAY: 2
+Clock Cycles with Last Row Writeback(if any): 36
+
+Cycle Wise Analysis
+
+Cycle Count          Instruction                         Register/Memory/Request                           
+Cycle 1:             addi $t2, $t0, 3                    $t2 = 3                                           
+Cycle 2:             addi $t3, $t0, 4                    $t3 = 4                                           
+Cycle 3:             sw $t2, 1($t2)                      DRAM: Request Issued                              
+Cycle 4:             add $t5, $t6, $t3                   $t5 = 4                                           
+Cycle 5:             addi $t4, $t5, 95                   $t4 = 99                                          
+Cycle 4-13:          DRAM: Activate row 0                                                                  
+Cycle 14-15:         DRAM: Column Access                 Address 4-7 = 3                                   
+Cycle 16:            addi $t4, $t2, 10                   $t4 = 13                                          
+Cycle 17:            addi $t2, $t4, 10                   $t2 = 23                                          
+Cycle 18:            addi $s0, $t0, 20                   $s0 = 20                                          
+Cycle 19:            addi $s1, $t0, 420                  $s1 = 420                                         
+Cycle 20:            sw $s1, 0($s0)                      DRAM: Request Issued                              
+Cycle 21-22:         DRAM: Column Access                 Address 20-23 = 420                               
+Cycle 23:            lw $s2, 0($s0)                      DRAM: Request Issued                              
+Cycle 24:            add $s1, $s1, $s1                   $s1 = 840                                         
+Cycle 24-25:         DRAM: Column Access                 0 = 420                                           
+Cycle 26:            add $s2, $s2, $s2                   $s2 = 840                                         
+Cycle 27-36:         DRAM: Writeback row 0                                                                 
+======================================
+Program Execeuted Successfully
+======================================
+Program Statistics
+Row Buffer Updates : 3
+
+Memory Content
+20-23: 420
+4-7: 3
