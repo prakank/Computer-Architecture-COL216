@@ -1,0 +1,13 @@
+sw $t4, 1024($zero)
+add $t3, $t1, $t2
+add $t3, $t1, $t2
+add $t3, $t1, $t2
+add $t3, $t1, $t2
+add $t3, $t1, $t2
+add $t3, $t1, $t2
+add $t3, $t1, $t2
+add $t3, $t1, $t2
+add $t3, $t1, $t2
+add $t3, $t1, $t2
+add $t3, $t1, $t2
+sw $t4, 1000($zero)

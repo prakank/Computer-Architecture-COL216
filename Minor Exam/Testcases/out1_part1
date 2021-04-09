@@ -1,0 +1,37 @@
+PART 1
+
+ROW_ACCESS_DELAY: 10
+COLUMN_ACCESS_DELAY: 2
+Clock Cycles with Last Row Writeback(if any): 57
+
+Cycle Wise Analysis
+
+Cycle Count          Instruction                         Register/Memory/Request                           
+Cycle 1:             sw $t4, 1024($zero)                 DRAM: Request Issued                              
+Cycle 2-11:          DRAM: Activate row 1                                                                  
+Cycle 12-13:         DRAM: Column Access                 Address 1024-1027 = 0                             
+Cycle 14:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 15:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 16:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 17:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 18:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 19:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 20:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 21:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 22:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 23:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 24:            add $t3, $t1, $t2                   $t3 = 0                                           
+Cycle 25:            sw $t4, 1000($zero)                 DRAM: Request Issued                              
+Cycle 26-35:         DRAM: Writeback row 1                                                                 
+Cycle 36-45:         DRAM: Activate row 0                                                                  
+Cycle 46-47:         DRAM: Column Access                 Address 1000-1003 = 0                             
+Cycle 48-57:         DRAM: Writeback row 0                                                                 
+======================================
+Program Execeuted Successfully
+======================================
+Program Statistics
+Row Buffer Updates : 4
+
+Memory Content
+1000-1003: 0
+1024-1027: 0
