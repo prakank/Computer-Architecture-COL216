@@ -695,6 +695,7 @@ int main(int argc, char * argv[]){
                 for(auto i = MemoryContent.begin();i!=MemoryContent.end();i++){
                     if(!heading)cout << "\nMemory Content\n";
                     heading = true;
+                    // if( i->second != "0")
                     cout << i->first << ": " << i->second << "\n";
                 }
                 // cout << "Instruction Count : " << print_count - 1 << endl;
