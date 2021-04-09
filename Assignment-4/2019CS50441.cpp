@@ -20,6 +20,7 @@ using namespace std;
 map<string,int> reg, label;
 map<string,pair<int,int>> RegisterUpdation, RegisterUse;
 map<int,pair<int,int>> MemoryUpdation, MemoryUse;
+map<string,int> InstructionCountVector;
 
 string print_msg = "";
 vector<vector<int>> Dram; // Dynamic Random Access Memory
@@ -33,7 +34,7 @@ int RowBuffer          = -1;                   // Assumption - We have only 1 Ro
                                                // Also defined a vector named RowBufferCopy to store the orginal copy of row copied to row buffer
 
 int TotalMemory        = TotalMemory_4Bytes/4;
-int print_count        = 1;
+int print_count        = 0;
 int ErrorLine          = -1;
 int NumberOfCycles     = 0;
 int StartTime          = -1;
@@ -105,10 +106,18 @@ bool is_number(const string& s)
 }
 
 void std_registers(){
-    reg["$t0"]=0;reg["$t1"]=0;reg["$t2"]=0;reg["$t3"]=0;reg["$t4"]=0;reg["$t5"]=0;reg["$t6"]=0;reg["$t7"]=0;reg["$t8"]=0;reg["$t9"]=0;
-    reg["$s0"]=0;reg["$s1"]=0;reg["$s2"]=0;reg["$s3"]=0;reg["$s4"]=0;reg["$s5"]=0;reg["$s6"]=0;reg["$s7"]=0;reg["$s8"]=0;reg["$s9"]=0;
-    reg["$r0"]=0;reg["$r1"]=0;reg["$r2"]=0;reg["$r3"]=0;reg["$r4"]=0;reg["$r5"]=0;reg["$r6"]=0;reg["$r7"]=0;reg["$r8"]=0;reg["$r9"]=0;
-    reg["$v0"]=0;reg["$zero"]=0;
+
+    // Standard QTSPIM registers
+    reg["$zero"] =0; reg["$at"]=0; reg["$v0"]=0; reg["$v1"]=0; 
+    reg  ["$a0"]   =0; reg["$a1"]=0; reg["$a2"]=0; reg["$a3"]=0; 
+    reg  ["$t0"]   =0; reg["$t1"]=0; reg["$t2"]=0; reg["$t3"]=0; reg["$t4"]=0; reg["$t5"]=0; reg["$t6"]=0; reg["$t7"]=0;
+    reg  ["$s0"]   =0; reg["$s1"]=0; reg["$s2"]=0; reg["$s3"]=0; reg["$s4"]=0; reg["$s5"]=0; reg["$s6"]=0; reg["$s7"]=0;
+    reg  ["$t8"]   =0; reg["$t9"]=0; reg["$k0"]=0; reg["$k1"]=0; reg["$gp"]=0; reg["$sp"]=0; reg["$fp"]=0; reg["$ra"]=0;
+
+    // reg["$t0"]=0;reg["$t1"]=0;reg["$t2"]=0;reg["$t3"]=0;reg["$t4"]=0;reg["$t5"]=0;reg["$t6"]=0;reg["$t7"]=0;reg["$t8"]=0;reg["$t9"]=0;
+    // reg["$s0"]=0;reg["$s1"]=0;reg["$s2"]=0;reg["$s3"]=0;reg["$s4"]=0;reg["$s5"]=0;reg["$s6"]=0;reg["$s7"]=0;reg["$s8"]=0;reg["$s9"]=0;
+    // reg["$r0"]=0;reg["$r1"]=0;reg["$r2"]=0;reg["$r3"]=0;reg["$r4"]=0;reg["$r5"]=0;reg["$r6"]=0;reg["$r7"]=0;reg["$r8"]=0;reg["$r9"]=0;
+    // reg["$v0"]=0;reg["$zero"]=0;
 
     // reg["$r0"]=0;reg["$r1"]=0;reg["$r2"]=0;reg["$r3"]=0;reg["$r4"]=0;reg["$r5"]=0;reg["$r6"]=0;reg["$r7"]=0;reg["$r8"]=0;reg["$r9"]=0;
     // reg["$r10"]=0;reg["$r11"]=0;reg["$r12"]=0;reg["$r13"]=0;reg["$r14"]=0;reg["$r15"]=0;reg["$r16"]=0;reg["$r17"]=0;reg["$r18"]=0;reg["$r19"]=0;
@@ -116,6 +125,18 @@ void std_registers(){
     // reg["$r30"]=0;reg["$zero"]=0;
 
     for(auto i = reg.begin(); i != reg.end(); i++){RegisterUpdation[i->ff] = mp(-1,-1); RegisterUse[i->ff] = mp(-1,-1);}
+
+    // Initializing the InstructionCountVector
+    InstructionCountVector["add"] = 0;
+    InstructionCountVector["addi"] = 0;
+    InstructionCountVector["sub"] = 0;
+    InstructionCountVector["mul"] = 0;
+    InstructionCountVector["beq"] = 0;
+    InstructionCountVector["bne"] = 0;
+    InstructionCountVector["slt"] = 0;
+    InstructionCountVector["j"] = 0;
+    InstructionCountVector["lw"] = 0;
+    InstructionCountVector["sw"] = 0;
 
 }
 
@@ -144,7 +165,9 @@ void print_ins(instruction ins){
     cout << "Jump_index : ->" << label[ins.jump] << "<-\n";
     cout << "Off : ->" << ins.offset << "<-\n";
     cout << "Fun_lable : ->" << ins.fun_label << "<-\n";
-    cout << "Dependency : "; printp(ins.dependent[0]) ; printp(ins.dependent[1]); printp(ins.dependent[2]) ; printp(ins.dependent[3]) ; cout << "\n\n";
+    cout << "Dependency : "; printp(ins.dependent[0]) ; printp(ins.dependent[1]); printp(ins.dependent[2]) ; printp(ins.dependent[3]) ; cout << "\n";
+    cout << ins.target << " (Updation): " ;printp(RegisterUpdation[ins.target]); cout << " (Use): ";printp(RegisterUse[ins.target]);cout << "\n";
+    cout << ins.source1 << " (Updation): " ;printp(RegisterUpdation[ins.source1]); cout << " (Use): ";printp(RegisterUse[ins.source1]);cout << "\n";
 }
 
 void print_map(map<string,int> m){
@@ -173,6 +196,13 @@ void print_command(PrintCommand pc){
         s += to_string(pc.Start) + "-" + to_string(pc.End);
         s += ":";
     }
+    
+    vector<string> countvector;
+    boost::split(countvector, pc.Command, boost::is_any_of(" "));
+    if(InstructionCountVector.find(countvector[0]) != InstructionCountVector.end()){
+        InstructionCountVector[countvector[0]]++;
+    }
+
     cout << boost::format("%-20s %-35s %-50s\n") % s % pc.Command % pc.Execution;
     if(pc.Execution!=""){
         vector<string> temp;
@@ -199,6 +229,7 @@ void AllotMemory(){
         flag = true;
         return;
     }
+
 }
 
 void tokenize(string s){
@@ -294,6 +325,7 @@ void ResolveDependency(instruction &ins){
             ResolveDependency(QueueInstruction[ins.dependent[i].ss]);
         }
     }
+    if(ins.dependent[0].ff == -2)return; // Instruction is already executed
     // After the above for loop, we have successfully executed all the Dependent instructions
     // Now, we have to execute the current lw/sw instruction
 
@@ -312,9 +344,9 @@ void ResolveDependency(instruction &ins){
     if(RowBuffer == ins.row){
         pr.Start = NumberOfCycles + 2;
         pr.End = pr.Start + ColumnDelay - 1;
-        pr.Command = "DRAM: Column Access";                        
+        pr.Command = "DRAM: Column Access (" + to_string(ColumnNumber) + ")";                        
         if(ins.op == "lw"){
-            pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+            pr.Execution = ins.target + " = " + to_string(Dram[RowNumber][ColumnNumber]);
         }
         else{
             pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
@@ -339,9 +371,9 @@ void ResolveDependency(instruction &ins){
         Command.push_back(pr);
         pr.Start = pr.End + 1;
         pr.End = pr.Start + ColumnDelay -1;
-        pr.Command = "DRAM: Column Access";
+        pr.Command = "DRAM: Column Access (" + to_string(ColumnNumber) + ")";                        
         if(ins.op == "lw"){
-            pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+            pr.Execution = ins.target + " = " + to_string(Dram[RowNumber][ColumnNumber]);
         }
         else{
             pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
@@ -356,11 +388,13 @@ void ResolveDependency(instruction &ins){
         // ins.row is the New Row
         // RowBuffer is the one which is in the Buffer
         RowBufferUpdates++;
-        if(RowBufferCopy == Dram[ins.row]){
+        if(RowBufferCopy == Dram[RowBuffer]){
             // No need to writeback if there is no updation in the row
             
             // StartTime = NumberOfCycles + 2;
             // EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
+
+            // cout << "HEYYYYYYYYYYYYYYYYYYY\n" << ins.row << " " << RowBuffer << endl; 
 
             pr.Start = NumberOfCycles + 2;
             pr.End = pr.Start + RowDelay - 1;
@@ -369,9 +403,9 @@ void ResolveDependency(instruction &ins){
             
             pr.Start = pr.End + 1;
             pr.End = pr.Start + ColumnDelay - 1;
-            pr.Command = "DRAM: Column Access";
+            pr.Command = "DRAM: Column Access (" + to_string(ColumnNumber) + ")";                        
             
-            if(ins.op == "lw")pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+            if(ins.op == "lw")pr.Execution = ins.target + " = " + to_string(Dram[RowNumber][ColumnNumber]);
             else pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
             
             Command.push_back(pr);
@@ -394,9 +428,9 @@ void ResolveDependency(instruction &ins){
             
             pr.Start = pr.End + 1;
             pr.End = pr.Start + ColumnDelay -1;
-            pr.Command = "DRAM: Column Access";
+            pr.Command = "DRAM: Column Access (" + to_string(ColumnNumber) + ")";                        
             
-            if(ins.op == "lw")pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+            if(ins.op == "lw")pr.Execution = ins.target + " = " + to_string(Dram[RowNumber][ColumnNumber]);
             else pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
             
             Command.push_back(pr);
@@ -420,6 +454,10 @@ void ResolveDependency(instruction &ins){
     }
     // NumberOfCycles++;
     ins.dependent[0] = mp(-2,-2); // This implies the particular instruction in the vector is executed
+    for(int i=QueueInstruction.size()-1;i>=0;i--){
+        if(QueueInstruction[i].dependent[0].ff == -2)continue;
+        if(QueueInstruction[i].row == RowBuffer)ResolveDependency(QueueInstruction[i]);
+    }
     return;
 
 
@@ -430,9 +468,10 @@ void parse(){
     while(i<instr.size()){
         instruction ins = instr[i];
         instr[i].InstructionCount++;
+        print_count++;
         ErrorLine = i;
-        RegisterUpdation["$zero"] = mp(-1,-2); // Initializing the zero register's RegisterUpdation value to 0 in each loop
-        RegisterUse["$zero"] = mp(-1,-2);      // Initializing the zero register's RegisterUse value to 0 in each loop
+        RegisterUpdation["$zero"] = mp(-1,-1); // Initializing the zero register's RegisterUpdation value to 0 in each loop
+        RegisterUse["$zero"] = mp(-1,-1);      // Initializing the zero register's RegisterUse value to 0 in each loop
 
         // print_ins(ins);
         
@@ -451,10 +490,10 @@ void parse(){
             if(RegisterUpdation[ins.target].ff >=0 || RegisterUse[ins.target].ff >=0 || RegisterUpdation[ins.source1].ff >=0 || RegisterUpdation[ins.source2].ff >=0 ){
                 // Pura Tandav 
                 // COMPLEX
-                ResolveDependency(QueueInstruction[RegisterUpdation[ins.target].ss]);
-                ResolveDependency(QueueInstruction[RegisterUse[ins.target].ss]);
-                ResolveDependency(QueueInstruction[RegisterUpdation[ins.source1].ss]);
-                ResolveDependency(QueueInstruction[RegisterUpdation[ins.source2].ss]);
+                if(RegisterUpdation[ins.target].ff >=0)ResolveDependency(QueueInstruction[RegisterUpdation[ins.target].ss]);
+                if(RegisterUse[ins.target].ff >=0)ResolveDependency(QueueInstruction[RegisterUse[ins.target].ss]);
+                if(RegisterUpdation[ins.source1].ff >=0)ResolveDependency(QueueInstruction[RegisterUpdation[ins.source1].ss]);
+                if(RegisterUpdation[ins.source2].ff >=0)ResolveDependency(QueueInstruction[RegisterUpdation[ins.source2].ss]);
             }
             
             PrintCommand pr;
@@ -490,10 +529,10 @@ void parse(){
                 print_msg = "ERROR : Unknown Function\n";
                 return;
             }
-            if( RegisterUpdation[ins.source1].ff >=0 || RegisterUpdation[ins.source2].ff >=0){
+            if( RegisterUse[ins.source1].ff >=0 || RegisterUse[ins.source2].ff >=0){
 
-                ResolveDependency(QueueInstruction[RegisterUpdation[ins.source1].ss]);
-                ResolveDependency(QueueInstruction[RegisterUpdation[ins.source2].ss]);
+                if(RegisterUpdation[ins.source1].ff >=0)ResolveDependency(QueueInstruction[RegisterUse[ins.source1].ss]);
+                if(RegisterUpdation[ins.source2].ff >=0)ResolveDependency(QueueInstruction[RegisterUse[ins.source2].ss]);
 
             }
 
@@ -560,14 +599,18 @@ void parse(){
             }
             
             for(int i=0;i<4;i++)ins.dependent.pb(mp(-1,-1)); // Initializing length to 4for(int i=0;i<4;i++)ins.dependent.pb(-1); // Initializing length to 4
-
+            
+            if(MemoryUpdation.find(x) == MemoryUpdation.end()) MemoryUpdation[x] = mp(-1,-1);
+            if(MemoryUse.find(x) == MemoryUse.end()) MemoryUse[x] = mp(-1,-1);
+            
             if(RowBuffer == -1 || RowBuffer != ins.row){
-                                
+
+                // cout << ins.op << "\n";                
                 if(ins.op == "lw"){
 
                     if(RegisterUpdation[ins.source1].ff >= 0 || MemoryUpdation[x].ff >=0 || RegisterUse[ins.target].ff >=0 || RegisterUpdation[ins.target].ff >= 0){
                         // This implies the current instruction is dependent on some instruction already present in the Queue
-                        ins.dependent[0] = RegisterUpdation[ins.source1];
+                        ins.dependent[0] = RegisterUpdation[ins.source1];                        
                         ins.dependent[1] = MemoryUpdation[x];
                         ins.dependent[2] = RegisterUse[ins.target];
                         ins.dependent[3] = RegisterUpdation[ins.target];
@@ -582,8 +625,13 @@ void parse(){
 
                     if(RegisterUpdation[ins.source1].ff >= 0 || MemoryUpdation[x].ff >=0 || MemoryUse[x].ff >=0 || RegisterUpdation[ins.target].ff >= 0){
                         ins.dependent[0] = RegisterUpdation[ins.source1];
+                        
+                        
                         ins.dependent[1] = MemoryUpdation[x];
+                        
+                        
                         ins.dependent[2] = MemoryUse[x];
+                        
                         ins.dependent[3] = RegisterUpdation[ins.target];
                     }
 
@@ -594,6 +642,19 @@ void parse(){
                 }
 
                 QueueInstruction.pb(ins);
+                
+                // DEBUGGING
+                // print_ins(QueueInstruction[QueueInstruction.size()-1]);
+                // cout << "Memory Updation  " << x << " : " ; printp(MemoryUpdation[x]); cout << endl;
+                // cout << "Memory Use " << x << " : " ; printp(MemoryUse[x]); cout << endl << endl;
+                
+                // for(int i=QueueInstruction.size()-1;i>=QueueInstruction.size()-1;i--){
+                //     // cout << (QueueInstruction.size()) << endl;
+                //     // print_ins(QueueInstruction[i]);
+                //     cout << i << endl;
+                //     // ResolveDependency(QueueInstruction[i]);
+                // }
+
 
             }  
 
@@ -624,8 +685,8 @@ void parse(){
                         pr.Execution = "";
                         pr.Start = NumberOfCycles + 2;
                         pr.End = pr.Start + ColumnDelay - 1;
-                        pr.Command = "DRAM: Column Access";                        
-                        pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+                        pr.Command = "DRAM: Column Access (" + to_string(ColumnNumber) + ")";                                        
+                        pr.Execution = ins.target + " = " + to_string(Dram[RowNumber][ColumnNumber]);
                         reg[ins.target] = Dram[RowNumber][ColumnNumber];
                         Command.pb(pr);
                         NumberOfCycles = pr.End;
@@ -657,7 +718,7 @@ void parse(){
                         pr.Execution = "";
                         pr.Start = NumberOfCycles + 2;
                         pr.End = pr.Start + ColumnDelay - 1;
-                        pr.Command = "DRAM: Column Access";                        
+                        pr.Command = "DRAM: Column Access (" + to_string(ColumnNumber) + ")";                                             
                         pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
 
                         if(Dram[RowNumber][ColumnNumber] != reg[ins.target])RowBufferUpdates++;
@@ -822,7 +883,7 @@ void parse(){
             }
             int x = 0, y = 0;
 
-            // cout << ins.source1 << " " << ins.source2 << endl;
+            // cout << ins.source1 << " " << ins.source2 << " " ; printp(RegisterUse[ins.source1]) ; cout <<  endl;
 
             if(ins.source1[0] == '$' && reg.find(ins.source1) == reg.end()){
                 flag = true;
@@ -837,33 +898,43 @@ void parse(){
             else{  // First symbol is $ and is present in Register file
                 x = reg[ins.source1];
                 if(RegisterUpdation[ins.source1].ff >=0){
+                    // cout << "Hey" << "\n";
                     ResolveDependency(QueueInstruction[RegisterUpdation[ins.source1].ss]);
                     // continue;
                 }
             }
+
             // cout << ins.source1 << " " << ins.source2 << endl;
+            
             if(ins.source2[0] == '$' && reg.find(ins.source2) == reg.end()){
                 flag = true;
                 print_msg = "ERROR : Unknown Register\n";
                 return;
             }            
             else if(ins.source2[0]!='$'){
+                
                 flag = !is_number(ins.source2);
                 if(flag){print_msg = "ERROR : Not a number\n"; return;}                
                 y = stoi(ins.source2);
+                
             }
             else{  // First symbol is $ and is present in Register file
                 y = reg[ins.source2];
+                
                 if(RegisterUpdation[ins.source2].ff >=0){
                     ResolveDependency(QueueInstruction[RegisterUpdation[ins.source2].ss]);
                     // continue;
                 }
             }
+            // cout << ins.source1 << " " << ins.source2 << endl;
 
             // cout << "Hey  "  << ins.target << "  " <<  NumberOfCycles <<   "\n" ;
 
             if(RegisterUpdation[ins.target].ff >=0 || RegisterUse[ins.target].ff >=0){
-                ResolveDependency(QueueInstruction[RegisterUpdation[ins.target].ss]);
+                // cout << ins.source1 << " " << ins.source2 << endl;
+                // cout << "Hey\n";
+                if(RegisterUpdation[ins.target].ff >= 0)ResolveDependency(QueueInstruction[RegisterUpdation[ins.target].ss]);
+                if(RegisterUse[ins.target].ff >= 0)ResolveDependency(QueueInstruction[RegisterUse[ins.target].ss]);
                 // continue;
             }
 
@@ -879,7 +950,7 @@ void parse(){
             NumberOfCycles++;
         }
         
-        else i++; //  This is for the labels like "main:" or "loop:" which will not be covered in any if the cases above and nor the NumberOfCycles will be incremented on this  
+        else {i++;print_count--;} //  This is for the labels like "main:" or "loop:" which will not be covered in any if the cases above and nor the NumberOfCycles will be incremented on this  
 
         // if(ins.op!="")
         // {
@@ -892,31 +963,31 @@ void parse(){
 }
 
 int main(int argc, char * argv[]){
-    if(argc >= 3 && argc <= 5){
-        if(!is_number(argv[2])){
-            cout << "Invalid Input: Part can only be 1 or 2\n";
-            return -1;
-        }
-        int PartNumber = stoi(argv[2]);
-        if(PartNumber > 2 || PartNumber < 1){
-            cout << "Invalid Input: Part can only be 1 or 2\n";
-            return -1;
-        }
-        if(PartNumber == 2)Part2 = true;
+    if(argc >= 2 && argc <= 4){
+        // if(!is_number(argv[2])){
+        //     cout << "Invalid Input: Part can only be 1 or 2\n";
+        //     return -1;
+        // }
+        // int PartNumber = stoi(argv[2]);
+        // if(PartNumber > 2 || PartNumber < 1){
+        //     cout << "Invalid Input: Part can only be 1 or 2\n";
+        //     return -1;
+        // }
+        // if(PartNumber == 2)Part2 = true;
         ifstream infile(argv[1]);
-        if(argc >= 4){
-            if(!is_number(argv[3])){
+        if(argc >= 3){
+            if(!is_number(argv[2])){
                 cout << "Invalid Input: ROW_ACCESS_DELAY should be an integer\n";
                 return -1;
             }
-            RowDelay = stoi(argv[3]);            
+            RowDelay = stoi(argv[2]);
         }
-        if(argc == 5){
-            if(!is_number(argv[4])){
+        if(argc == 4){
+            if(!is_number(argv[3])){
                 cout << "Invalid Input: COLUMN_ACCESS_DELAY should be an integer\n";
                 return -1;
             }
-            ColumnDelay = stoi(argv[4]);
+            ColumnDelay = stoi(argv[3]);
         }
         vector<string> text_file;
         if(infile.is_open()){
@@ -953,6 +1024,17 @@ int main(int argc, char * argv[]){
             }
             else{
                 
+                // cout << printp(RegisterUpdation["$t1"] << " " << RegisterUse["$t1"] << " " << RegisterUpdation["$s0"] << " " << RegisterUse["$s0"] << "\n";
+                // printp(RegisterUpdation["$t1"]);
+                // printp(RegisterUse["$t1"]);
+                // printp(RegisterUpdation["$s0"]);
+                // printp(RegisterUse["$s0"]);
+
+                // for(int i=QueueInstruction.size()-1;i>=0;i--){
+                //     // cout << (QueueInstruction.size()) << endl;
+                //     print_ins(QueueInstruction[i]);
+                //     // ResolveDependency(QueueInstruction[i]);
+                // }
 
                 for(int i=QueueInstruction.size()-1;i>=0;i--){
                     // cout << (QueueInstruction.size()) << endl;
@@ -968,8 +1050,9 @@ int main(int argc, char * argv[]){
                     Command.pb(pr);
                 }
                 sort(Command.begin(),Command.end(),Comparator);
-                if(Part2)cout << "PART 2\n\n";
-                else cout << "PART 1\n\n";
+                cout << "ASSIGNMENT 4\n\n";
+                // if(Part2)cout << "PART 2\n\n";
+                // else cout << "PART 1\n\n";
                 cout << "ROW_ACCESS_DELAY: " << RowDelay << "\n";
                 cout << "COLUMN_ACCESS_DELAY: " << ColumnDelay << "\n";
                 cout << "Clock Cycles with Last Row Writeback(if any): " << Command[Command.size()-1].End<< "\n\n";
@@ -990,18 +1073,19 @@ int main(int argc, char * argv[]){
                 for(auto i = MemoryContent.begin();i!=MemoryContent.end();i++){
                     if(!heading)cout << "\nMemory Content\n";
                     heading = true;
-                    // if( i->second != "0")
+                    if( i->second != "0")
                     cout << i->first << ": " << i->second << "\n";
                 }
-                // cout << "Instruction Count : " << print_count - 1 << endl;
-                // cout << "Instruction Execution Count:\n";
-                // int j = 1;
-                // for(int i=0;i<instr.size();i++){
-                //     if(instr[i].original!=""){
-                //         cout << j << ". " << instr[i].original << " : "  << instr[i].InstructionCount <<  "\n";
-                //         j++;
-                //     }
-                // }
+                
+                cout << "\nInstruction Count : " << print_count  << endl;
+                cout << "Instruction Execution Count:\n";
+                int j = 1;
+                for(int i=0;i<instr.size();i++){
+                    if(instr[i].original!=""){
+                        cout << j << ". " << instr[i].original << " : "  << instr[i].InstructionCount <<  "\n";
+                        j++;
+                    }
+                }
             }
         }
         else cout << "File not found.\n";
