@@ -144,7 +144,9 @@ void print_ins(instruction ins){
     cout << "Jump_index : ->" << label[ins.jump] << "<-\n";
     cout << "Off : ->" << ins.offset << "<-\n";
     cout << "Fun_lable : ->" << ins.fun_label << "<-\n";
-    cout << "Dependency : "; printp(ins.dependent[0]) ; printp(ins.dependent[1]); printp(ins.dependent[2]) ; printp(ins.dependent[3]) ; cout << "\n\n";
+    cout << "Dependency : "; printp(ins.dependent[0]) ; printp(ins.dependent[1]); printp(ins.dependent[2]) ; printp(ins.dependent[3]) ; cout << "\n";
+    cout << ins.target << " (Updation): " ;printp(RegisterUpdation[ins.target]); cout << " (Use): ";printp(RegisterUse[ins.target]);cout << "\n";
+    cout << ins.source1 << " (Updation): " ;printp(RegisterUpdation[ins.source1]); cout << " (Use): ";printp(RegisterUse[ins.source1]);cout << "\n";
 }
 
 void print_map(map<string,int> m){
@@ -356,11 +358,13 @@ void ResolveDependency(instruction &ins){
         // ins.row is the New Row
         // RowBuffer is the one which is in the Buffer
         RowBufferUpdates++;
-        if(RowBufferCopy == Dram[ins.row]){
+        if(RowBufferCopy == Dram[RowBuffer]){
             // No need to writeback if there is no updation in the row
             
             // StartTime = NumberOfCycles + 2;
             // EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
+
+            // cout << "HEYYYYYYYYYYYYYYYYYYY\n" << ins.row << " " << RowBuffer << endl; 
 
             pr.Start = NumberOfCycles + 2;
             pr.End = pr.Start + RowDelay - 1;
@@ -431,8 +435,8 @@ void parse(){
         instruction ins = instr[i];
         instr[i].InstructionCount++;
         ErrorLine = i;
-        RegisterUpdation["$zero"] = mp(-1,-2); // Initializing the zero register's RegisterUpdation value to 0 in each loop
-        RegisterUse["$zero"] = mp(-1,-2);      // Initializing the zero register's RegisterUse value to 0 in each loop
+        RegisterUpdation["$zero"] = mp(-1,-1); // Initializing the zero register's RegisterUpdation value to 0 in each loop
+        RegisterUse["$zero"] = mp(-1,-1);      // Initializing the zero register's RegisterUse value to 0 in each loop
 
         // print_ins(ins);
         
@@ -490,10 +494,10 @@ void parse(){
                 print_msg = "ERROR : Unknown Function\n";
                 return;
             }
-            if( RegisterUpdation[ins.source1].ff >=0 || RegisterUpdation[ins.source2].ff >=0){
+            if( RegisterUse[ins.source1].ff >=0 || RegisterUse[ins.source2].ff >=0){
 
-                ResolveDependency(QueueInstruction[RegisterUpdation[ins.source1].ss]);
-                ResolveDependency(QueueInstruction[RegisterUpdation[ins.source2].ss]);
+                ResolveDependency(QueueInstruction[RegisterUse[ins.source1].ss]);
+                ResolveDependency(QueueInstruction[RegisterUse[ins.source2].ss]);
 
             }
 
@@ -560,14 +564,18 @@ void parse(){
             }
             
             for(int i=0;i<4;i++)ins.dependent.pb(mp(-1,-1)); // Initializing length to 4for(int i=0;i<4;i++)ins.dependent.pb(-1); // Initializing length to 4
-
+            
+            if(MemoryUpdation.find(x) == MemoryUpdation.end()) MemoryUpdation[x] = mp(-1,-1);
+            if(MemoryUse.find(x) == MemoryUse.end()) MemoryUse[x] = mp(-1,-1);
+            
             if(RowBuffer == -1 || RowBuffer != ins.row){
-                                
+
+                // cout << ins.op << "\n";                
                 if(ins.op == "lw"){
 
                     if(RegisterUpdation[ins.source1].ff >= 0 || MemoryUpdation[x].ff >=0 || RegisterUse[ins.target].ff >=0 || RegisterUpdation[ins.target].ff >= 0){
                         // This implies the current instruction is dependent on some instruction already present in the Queue
-                        ins.dependent[0] = RegisterUpdation[ins.source1];
+                        ins.dependent[0] = RegisterUpdation[ins.source1];                        
                         ins.dependent[1] = MemoryUpdation[x];
                         ins.dependent[2] = RegisterUse[ins.target];
                         ins.dependent[3] = RegisterUpdation[ins.target];
@@ -582,8 +590,13 @@ void parse(){
 
                     if(RegisterUpdation[ins.source1].ff >= 0 || MemoryUpdation[x].ff >=0 || MemoryUse[x].ff >=0 || RegisterUpdation[ins.target].ff >= 0){
                         ins.dependent[0] = RegisterUpdation[ins.source1];
+                        
+                        
                         ins.dependent[1] = MemoryUpdation[x];
+                        
+                        
                         ins.dependent[2] = MemoryUse[x];
+                        
                         ins.dependent[3] = RegisterUpdation[ins.target];
                     }
 
@@ -594,6 +607,18 @@ void parse(){
                 }
 
                 QueueInstruction.pb(ins);
+                
+                // DEBUGGING
+                print_ins(QueueInstruction[QueueInstruction.size()-1]);
+                cout << "Memory Updation  " << x << " : " ; printp(MemoryUpdation[x]); cout << endl;
+                cout << "Memory Use " << x << " : " ; printp(MemoryUse[x]); cout << endl << endl;
+                // for(int i=QueueInstruction.size()-1;i>=QueueInstruction.size()-1;i--){
+                //     // cout << (QueueInstruction.size()) << endl;
+                //     // print_ins(QueueInstruction[i]);
+                //     cout << i << endl;
+                //     // ResolveDependency(QueueInstruction[i]);
+                // }
+
 
             }  
 
@@ -822,7 +847,7 @@ void parse(){
             }
             int x = 0, y = 0;
 
-            // cout << ins.source1 << " " << ins.source2 << endl;
+            // cout << ins.source1 << " " << ins.source2 << " " ; printp(RegisterUse[ins.source1]) ; cout <<  endl;
 
             if(ins.source1[0] == '$' && reg.find(ins.source1) == reg.end()){
                 flag = true;
@@ -837,33 +862,43 @@ void parse(){
             else{  // First symbol is $ and is present in Register file
                 x = reg[ins.source1];
                 if(RegisterUpdation[ins.source1].ff >=0){
+                    // cout << "Hey" << "\n";
                     ResolveDependency(QueueInstruction[RegisterUpdation[ins.source1].ss]);
                     // continue;
                 }
             }
+
             // cout << ins.source1 << " " << ins.source2 << endl;
+            
             if(ins.source2[0] == '$' && reg.find(ins.source2) == reg.end()){
                 flag = true;
                 print_msg = "ERROR : Unknown Register\n";
                 return;
             }            
             else if(ins.source2[0]!='$'){
+                
                 flag = !is_number(ins.source2);
                 if(flag){print_msg = "ERROR : Not a number\n"; return;}                
                 y = stoi(ins.source2);
+                
             }
             else{  // First symbol is $ and is present in Register file
                 y = reg[ins.source2];
+                
                 if(RegisterUpdation[ins.source2].ff >=0){
                     ResolveDependency(QueueInstruction[RegisterUpdation[ins.source2].ss]);
                     // continue;
                 }
             }
+            // cout << ins.source1 << " " << ins.source2 << endl;
 
             // cout << "Hey  "  << ins.target << "  " <<  NumberOfCycles <<   "\n" ;
 
             if(RegisterUpdation[ins.target].ff >=0 || RegisterUse[ins.target].ff >=0){
-                ResolveDependency(QueueInstruction[RegisterUpdation[ins.target].ss]);
+                // cout << ins.source1 << " " << ins.source2 << endl;
+                // cout << "Hey\n";
+                if(RegisterUpdation[ins.target].ff >= 0)ResolveDependency(QueueInstruction[RegisterUpdation[ins.target].ss]);
+                if(RegisterUse[ins.target].ff >= 0)ResolveDependency(QueueInstruction[RegisterUse[ins.target].ss]);
                 // continue;
             }
 
@@ -892,31 +927,31 @@ void parse(){
 }
 
 int main(int argc, char * argv[]){
-    if(argc >= 3 && argc <= 5){
-        if(!is_number(argv[2])){
-            cout << "Invalid Input: Part can only be 1 or 2\n";
-            return -1;
-        }
-        int PartNumber = stoi(argv[2]);
-        if(PartNumber > 2 || PartNumber < 1){
-            cout << "Invalid Input: Part can only be 1 or 2\n";
-            return -1;
-        }
-        if(PartNumber == 2)Part2 = true;
+    if(argc >= 2 && argc <= 4){
+        // if(!is_number(argv[2])){
+        //     cout << "Invalid Input: Part can only be 1 or 2\n";
+        //     return -1;
+        // }
+        // int PartNumber = stoi(argv[2]);
+        // if(PartNumber > 2 || PartNumber < 1){
+        //     cout << "Invalid Input: Part can only be 1 or 2\n";
+        //     return -1;
+        // }
+        // if(PartNumber == 2)Part2 = true;
         ifstream infile(argv[1]);
-        if(argc >= 4){
-            if(!is_number(argv[3])){
+        if(argc >= 3){
+            if(!is_number(argv[2])){
                 cout << "Invalid Input: ROW_ACCESS_DELAY should be an integer\n";
                 return -1;
             }
-            RowDelay = stoi(argv[3]);            
+            RowDelay = stoi(argv[2]);
         }
-        if(argc == 5){
-            if(!is_number(argv[4])){
+        if(argc == 4){
+            if(!is_number(argv[3])){
                 cout << "Invalid Input: COLUMN_ACCESS_DELAY should be an integer\n";
                 return -1;
             }
-            ColumnDelay = stoi(argv[4]);
+            ColumnDelay = stoi(argv[3]);
         }
         vector<string> text_file;
         if(infile.is_open()){
@@ -953,6 +988,17 @@ int main(int argc, char * argv[]){
             }
             else{
                 
+                // cout << printp(RegisterUpdation["$t1"] << " " << RegisterUse["$t1"] << " " << RegisterUpdation["$s0"] << " " << RegisterUse["$s0"] << "\n";
+                // printp(RegisterUpdation["$t1"]);
+                // printp(RegisterUse["$t1"]);
+                // printp(RegisterUpdation["$s0"]);
+                // printp(RegisterUse["$s0"]);
+
+                // for(int i=QueueInstruction.size()-1;i>=0;i--){
+                //     // cout << (QueueInstruction.size()) << endl;
+                //     print_ins(QueueInstruction[i]);
+                //     // ResolveDependency(QueueInstruction[i]);
+                // }
 
                 for(int i=QueueInstruction.size()-1;i>=0;i--){
                     // cout << (QueueInstruction.size()) << endl;
@@ -968,8 +1014,9 @@ int main(int argc, char * argv[]){
                     Command.pb(pr);
                 }
                 sort(Command.begin(),Command.end(),Comparator);
-                if(Part2)cout << "PART 2\n\n";
-                else cout << "PART 1\n\n";
+                cout << "ASSIGNMENT 4\n\n";
+                // if(Part2)cout << "PART 2\n\n";
+                // else cout << "PART 1\n\n";
                 cout << "ROW_ACCESS_DELAY: " << RowDelay << "\n";
                 cout << "COLUMN_ACCESS_DELAY: " << ColumnDelay << "\n";
                 cout << "Clock Cycles with Last Row Writeback(if any): " << Command[Command.size()-1].End<< "\n\n";
