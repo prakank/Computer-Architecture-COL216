@@ -4,12 +4,22 @@
 #include<string>
 #include<iomanip>
 #include<map>
+#include<queue>
 #include<sstream>
 #include<boost/algorithm/string.hpp>
 #include<boost/format.hpp> 
 
+#define ff first
+#define pb push_back
+#define ss second
+#define mp make_pair
+#define pii pair<int,int>
+#define printp(x) cout << "(" <<  x.ff << "," << x.ss << ") "
+
 using namespace std;
-map<string,int> reg, label, RegisterUpdation, RegisterUse;
+map<string,int> reg, label;
+map<string,pair<int,int>> RegisterUpdation, RegisterUse;
+map<int,pair<int,int>> MemoryUpdation, MemoryUse;
 
 string print_msg = "";
 vector<vector<int>> Dram; // Dynamic Random Access Memory
@@ -52,10 +62,21 @@ struct instruction{
     string original = "";
     int InstructionCount = 0;
     int row = -1;
+    vector<pair<int,int>> dependent; // Can be of length at most 4.
+    // Different index will contain different instructions 
+    // Kind of instructions will also vary with lw, sw
 };
+
+// struct QueueInstruction{
+//     instruction ins;
+//     vector<int> dependent; // Can be of length at most 4.
+// };
 
 vector<instruction> instr;
 vector<PrintCommand> Command;
+
+// Also need to check whether a particular address is in use and whether it is accessed again
+vector<instruction> QueueInstruction;
 
 // First job is to parse over the file and store the instructions in instruction memory 
 
@@ -94,7 +115,7 @@ void std_registers(){
     // reg["$r20"]=0;reg["$r21"]=0;reg["$r22"]=0;reg["$r23"]=0;reg["$r24"]=0;reg["$r25"]=0;reg["$r26"]=0;reg["$r27"]=0;reg["$r28"]=0;reg["$r29"]=0;
     // reg["$r30"]=0;reg["$zero"]=0;
 
-    for(auto i = reg.begin(); i != reg.end(); i++){RegisterUpdation[i->first] = 0; RegisterUse[i->first] = 0;}
+    for(auto i = reg.begin(); i != reg.end(); i++){RegisterUpdation[i->ff] = mp(-1,-1); RegisterUse[i->ff] = mp(-1,-1);}
 
 }
 
@@ -104,7 +125,7 @@ void print_reg(){
         stringstream ss;
         ss << hex << i->second;
         string res(ss.str());
-        cout << i->first << ":" << res << ",   ";
+        cout << i->ff << ":" << res << ",   ";
         // cout << res << " ";
         cnt++;
         if(cnt%10==0 || cnt==32)cout<<"\n";
@@ -122,12 +143,13 @@ void print_ins(instruction ins){
     cout << "Jump : ->" << ins.jump << "<-\n";
     cout << "Jump_index : ->" << label[ins.jump] << "<-\n";
     cout << "Off : ->" << ins.offset << "<-\n";
-    cout << "Fun_lable : ->" << ins.fun_label << "<-\n\n";
+    cout << "Fun_lable : ->" << ins.fun_label << "<-\n";
+    cout << "Dependency : "; printp(ins.dependent[0]) ; printp(ins.dependent[1]); printp(ins.dependent[2]) ; printp(ins.dependent[3]) ; cout << "\n\n";
 }
 
 void print_map(map<string,int> m){
     for(auto i=m.begin(); i!=m.end();i++){
-        cout << "->" << i->first << "<-->" << i->second <<"<-\n"; 
+        cout << "->" << i->ff << "<-->" << i->second <<"<-\n"; 
     }
 }  
 
@@ -194,7 +216,7 @@ void tokenize(string s){
         ins.fun_label = strip(s.substr(0,j));
         if(ins.fun_label==""){flag=true;return;}
         label[ins.fun_label] = instr.size();
-        instr.push_back(ins);
+        instr.pb(ins);
         // cout << s << "   <- Label\n";
         // cout << "->" << s.substr(j+1,s.size()-j-1) << "<-Label\n";
         tokenize(s.substr(j+1,s.size()-j-1));
@@ -260,7 +282,147 @@ void tokenize(string s){
         return;
     }
     
-    instr.push_back(ins);
+    instr.pb(ins);
+}
+
+// Recursive function
+void ResolveDependency(instruction &ins){
+    
+    if(ins.dependent[0].ff == -2)return; // Instruction is already executed
+    for (int i=0;i<4;i++){
+        if(ins.dependent[i].ff != -1){
+            ResolveDependency(QueueInstruction[ins.dependent[i].ss]);
+        }
+    }
+    // After the above for loop, we have successfully executed all the Dependent instructions
+    // Now, we have to execute the current lw/sw instruction
+
+    int x = stoi(ins.offset) + reg[ins.source1];    
+    int RowNumber = (int)x/ColumnMemory;
+    int ColumnNumber = x - (RowNumber*ColumnMemory);       
+    ins.row = RowNumber;
+    
+    PrintCommand pr;
+    pr.Start = pr.End = NumberOfCycles + 1;
+    pr.Command = ins.original;
+    pr.Execution = "DRAM: Request Issued";
+    Command.push_back(pr);
+    pr.Execution = "";
+    
+    if(RowBuffer == ins.row){
+        pr.Start = NumberOfCycles + 2;
+        pr.End = pr.Start + ColumnDelay - 1;
+        pr.Command = "DRAM: Column Access";                        
+        if(ins.op == "lw"){
+            pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+        }
+        else{
+            pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
+        }
+        Command.push_back(pr);
+        NumberOfCycles = pr.End;
+        // ClockCounter.push_back(make_pair(NumberOfCycles + 1,NumberOfCycles + ColumnDelay ));
+        // CommandCounter.push_back("DRAM : Column Access");
+        // StartTime = NumberOfCycles+2;
+        // EndTime = NumberOfCycles + 1 + ColumnDelay;
+    }
+
+    else if(RowBuffer == -1){ // have to initiate the process
+        
+        RowBufferUpdates++;
+        
+        // StartTime = NumberOfCycles + 2;
+        // EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
+        pr.Start = NumberOfCycles + 2;
+        pr.End = pr.Start + RowDelay - 1;
+        pr.Command = "DRAM: Activate row " + to_string(ins.row);
+        Command.push_back(pr);
+        pr.Start = pr.End + 1;
+        pr.End = pr.Start + ColumnDelay -1;
+        pr.Command = "DRAM: Column Access";
+        if(ins.op == "lw"){
+            pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+        }
+        else{
+            pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
+        }
+        Command.push_back(pr);
+        RowBuffer = ins.row;
+        RowBufferCopy = Dram[ins.row];
+        NumberOfCycles = pr.End;
+    }
+
+    else{
+        // ins.row is the New Row
+        // RowBuffer is the one which is in the Buffer
+        RowBufferUpdates++;
+        if(RowBufferCopy == Dram[ins.row]){
+            // No need to writeback if there is no updation in the row
+            
+            // StartTime = NumberOfCycles + 2;
+            // EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
+
+            pr.Start = NumberOfCycles + 2;
+            pr.End = pr.Start + RowDelay - 1;
+            pr.Command = pr.Command = "DRAM: Activate row " + to_string(ins.row);
+            Command.push_back(pr);
+            
+            pr.Start = pr.End + 1;
+            pr.End = pr.Start + ColumnDelay - 1;
+            pr.Command = "DRAM: Column Access";
+            
+            if(ins.op == "lw")pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+            else pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
+            
+            Command.push_back(pr);
+            RowBuffer = ins.row;
+        }
+        else{
+            // Some changes took place in the Row Buffer, hence, we need to writeback that row to the DRAM
+            // StartTime = NumberOfCycles + 2;
+            // EndTime = NumberOfCycles + 1 + RowDelay*2 + ColumnDelay;
+            
+            pr.Start = NumberOfCycles + 2;
+            pr.End = pr.Start + RowDelay - 1;
+            pr.Command = "DRAM: Writeback row " + to_string(RowBuffer);
+            Command.push_back(pr);
+            
+            pr.Start = pr.End + 1;
+            pr.End = pr.Start + RowDelay - 1;
+            pr.Command = "DRAM: Activate row " + to_string(ins.row);
+            Command.push_back(pr);
+            
+            pr.Start = pr.End + 1;
+            pr.End = pr.Start + ColumnDelay -1;
+            pr.Command = "DRAM: Column Access";
+            
+            if(ins.op == "lw")pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+            else pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
+            
+            Command.push_back(pr);
+            RowBuffer = ins.row;
+        }
+        NumberOfCycles = pr.End;
+    }
+
+    if(ins.op == "lw"){
+        RegisterUse[ins.source1] = mp(-1,-1);
+        RegisterUpdation[ins.target] = mp(-1,-1);
+        MemoryUse[x] = mp(-1,-1);
+        reg[ins.target] = Dram[RowNumber][ColumnNumber];
+    }
+    else{
+        RegisterUse[ins.source1] = mp(-1,-1);
+        RegisterUse[ins.target] = mp(-1,-1);
+        MemoryUpdation[x] = mp(-1,-1);
+        if(Dram[RowNumber][ColumnNumber] != reg[ins.target])RowBufferUpdates++;
+        Dram[RowNumber][ColumnNumber] = reg[ins.target];
+    }
+    // NumberOfCycles++;
+    ins.dependent[0] = mp(-2,-2); // This implies the particular instruction in the vector is executed
+    return;
+
+
 }
 
 void parse(){
@@ -269,8 +431,8 @@ void parse(){
         instruction ins = instr[i];
         instr[i].InstructionCount++;
         ErrorLine = i;
-        RegisterUpdation["$zero"] = 0; // Initializing the zero register's RegisterUpdation value to 0 in each loop
-        RegisterUse["$zero"] = 0;      // Initializing the zero register's RegisterUse value to 0 in each loop
+        RegisterUpdation["$zero"] = mp(-1,-2); // Initializing the zero register's RegisterUpdation value to 0 in each loop
+        RegisterUse["$zero"] = mp(-1,-2);      // Initializing the zero register's RegisterUse value to 0 in each loop
 
         // print_ins(ins);
         
@@ -286,31 +448,34 @@ void parse(){
                 flag =true;
                 return;
             }
-            if(RegisterUpdation[ins.target] > NumberOfCycles || RegisterUpdation[ins.source1] > NumberOfCycles || RegisterUpdation[ins.source2] > NumberOfCycles || RegisterUse[ins.target] > NumberOfCycles){
-                NumberOfCycles = EndTime;
-                continue;
+            if(RegisterUpdation[ins.target].ff >=0 || RegisterUse[ins.target].ff >=0 || RegisterUpdation[ins.source1].ff >=0 || RegisterUpdation[ins.source2].ff >=0 ){
+                // Pura Tandav 
+                // COMPLEX
+                ResolveDependency(QueueInstruction[RegisterUpdation[ins.target].ss]);
+                ResolveDependency(QueueInstruction[RegisterUse[ins.target].ss]);
+                ResolveDependency(QueueInstruction[RegisterUpdation[ins.source1].ss]);
+                ResolveDependency(QueueInstruction[RegisterUpdation[ins.source2].ss]);
             }
-            else{
-                PrintCommand pr;
-                pr.Start = NumberOfCycles + 1;
-                pr.End = pr.Start;
-                pr.Command = ins.original;
-                
-                if(ins.op == "add")reg[ins.target] = reg[ins.source1] + reg[ins.source2];
-                if(ins.op == "sub")reg[ins.target] = reg[ins.source1] - reg[ins.source2];
-                if(ins.op == "mul")reg[ins.target] = reg[ins.source1] * reg[ins.source2];
-                if(ins.op == "slt"){
-                    if( reg[ins.source1] < reg[ins.source2] ) reg[ins.target] = 1;
-                    else reg[ins.target] = 0;
-                }
-                
-                pr.Execution = ins.target + " = " + to_string(reg[ins.target]);
-                Command.push_back(pr);
-                i++;
-                NumberOfCycles++;
-                // ClockCounter.push_back(make_pair(NumberOfCycles+1, NumberOfCycles+1));
-                // CommandCounter.push_back(ins.original);
+            
+            PrintCommand pr;
+            pr.Start = NumberOfCycles + 1;
+            pr.End = pr.Start;
+            pr.Command = ins.original;
+            
+            if(ins.op == "add")reg[ins.target] = reg[ins.source1] + reg[ins.source2];
+            if(ins.op == "sub")reg[ins.target] = reg[ins.source1] - reg[ins.source2];
+            if(ins.op == "mul")reg[ins.target] = reg[ins.source1] * reg[ins.source2];
+            if(ins.op == "slt"){
+                if( reg[ins.source1] < reg[ins.source2] ) reg[ins.target] = 1;
+                else reg[ins.target] = 0;
             }
+            
+            pr.Execution = ins.target + " = " + to_string(reg[ins.target]);
+            Command.pb(pr);
+            i++;
+            NumberOfCycles++;
+            // ClockCounter.pb(mp(NumberOfCycles+1, NumberOfCycles+1));
+            // CommandCounter.pb(ins.original);
             
         }
 
@@ -325,33 +490,34 @@ void parse(){
                 print_msg = "ERROR : Unknown Function\n";
                 return;
             }
-            if( RegisterUpdation[ins.source1] > NumberOfCycles || RegisterUpdation[ins.source2] > NumberOfCycles){
-                NumberOfCycles = EndTime;
-                continue;
-            }
-            else{
-                PrintCommand pr;
-                pr.Start = NumberOfCycles+1;
-                pr.End = pr.Start;
-                pr.Command = ins.original;
+            if( RegisterUpdation[ins.source1].ff >=0 || RegisterUpdation[ins.source2].ff >=0){
 
-                if(ins.op == "beq"){
-                    if( reg[ins.source1] == reg[ins.source2] ) {
-                        i = label[ins.jump];
-                        pr.Execution = "Values Matched : Jump to " + ins.jump;
-                    }
-                    else {i++; pr.Execution = "Values Mismatched : Move to next instruction";}
-                }
-                if( ins.op == "bne"){
-                    if( reg[ins.source1] != reg[ins.source2] ) {
-                        i = label[ins.jump];
-                        pr.Execution = "Values Mismatched : Jump to " + ins.jump;
-                    }
-                    else {i++; pr.Execution = "Values Matched : Move to next instruction";}
-                }
-                Command.push_back(pr);
-                NumberOfCycles++;
+                ResolveDependency(QueueInstruction[RegisterUpdation[ins.source1].ss]);
+                ResolveDependency(QueueInstruction[RegisterUpdation[ins.source2].ss]);
+
             }
+
+            PrintCommand pr;
+            pr.Start = NumberOfCycles+1;
+            pr.End = pr.Start;
+            pr.Command = ins.original;
+
+            if(ins.op == "beq"){
+                if( reg[ins.source1] == reg[ins.source2] ) {
+                    i = label[ins.jump];
+                    pr.Execution = "Values Matched : Jump to " + ins.jump;
+                }
+                else {i++; pr.Execution = "Values Mismatched : Move to next instruction";}
+            }
+            if( ins.op == "bne"){
+                if( reg[ins.source1] != reg[ins.source2] ) {
+                    i = label[ins.jump];
+                    pr.Execution = "Values Mismatched : Jump to " + ins.jump;
+                }
+                else {i++; pr.Execution = "Values Matched : Move to next instruction";}
+            }
+            Command.pb(pr);
+            NumberOfCycles++;
         }
 
         else if( ins.op == "j" ){
@@ -366,7 +532,7 @@ void parse(){
             pr.End = pr.Start;
             pr.Command = ins.original;
             pr.Execution = "Jump to " + ins.jump;
-            Command.push_back(pr);
+            Command.pb(pr);
             i = label[ins.jump];
             NumberOfCycles++;
         }
@@ -386,139 +552,261 @@ void parse(){
                 print_msg = "ERROR : Offset should be a multiple of 4\n";
                 return;
             }
-
-            if(x < MemoryAvailable){
-               
-                
-                if(EndTime <= NumberOfCycles){                    
-                    
-                    PrintCommand pr;
-                    pr.Start = pr.End = NumberOfCycles + 1;
-                    pr.Command = ins.original;
-                    pr.Execution = "DRAM: Request Issued";
-                    Command.push_back(pr);
-                    pr.Execution = "";
-
-                    if(RowBuffer == ins.row){
-                        pr.Start = NumberOfCycles + 2;
-                        pr.End = pr.Start + ColumnDelay - 1;
-                        pr.Command = "DRAM: Column Access";                        
-                        if(ins.op == "lw"){
-                            pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
-                        }
-                        else{
-                            pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
-                        }
-                        Command.push_back(pr);
-                        // ClockCounter.push_back(make_pair(NumberOfCycles + 1,NumberOfCycles + ColumnDelay ));
-                        // CommandCounter.push_back("DRAM : Column Access");
-                        StartTime = NumberOfCycles+2;
-                        EndTime = NumberOfCycles + 1 + ColumnDelay;
-                    }
-
-                    else if(RowBuffer == -1){ // have to initiate the process
                         
-                        RowBufferUpdates++;
-                        
-                        StartTime = NumberOfCycles + 2;
-                        EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
-                        pr.Start = NumberOfCycles + 2;
-                        pr.End = pr.Start + RowDelay - 1;
-                        pr.Command = "DRAM: Activate row " + to_string(ins.row);
-                        Command.push_back(pr);
-                        pr.Start = pr.End + 1;
-                        pr.End = pr.Start + ColumnDelay -1;
-                        pr.Command = "DRAM: Column Access";
-                        if(ins.op == "lw"){
-                            pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
-                        }
-                        else{
-                            pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
-                        }
-                        Command.push_back(pr);
-                        RowBuffer = ins.row;
-                        RowBufferCopy = Dram[ins.row];
-                    }
-
-                    else{
-                        // ins.row is the New Row
-                        // RowBuffer is the one which is in the Buffer
-                        RowBufferUpdates++;
-                        if(RowBufferCopy == Dram[ins.row]){
-                            // No need to writeback if there is no updation in the row
-                            
-                            StartTime = NumberOfCycles + 2;
-                            EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
-
-                            pr.Start = NumberOfCycles + 2;
-                            pr.End = pr.Start + RowDelay - 1;
-                            pr.Command = pr.Command = "DRAM: Activate row " + to_string(ins.row);
-                            Command.push_back(pr);
-                            
-                            pr.Start = pr.End + 1;
-                            pr.End = pr.Start + ColumnDelay - 1;
-                            pr.Command = "DRAM: Column Access";
-                            
-                            if(ins.op == "lw")pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
-                            else pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
-                            
-                            Command.push_back(pr);
-                            RowBuffer = ins.row;
-                        }
-                        else{
-                            // Some changes took place in the Row Buffer, hence, we need to writeback that row to the DRAM
-                            StartTime = NumberOfCycles + 2;
-                            EndTime = NumberOfCycles + 1 + RowDelay*2 + ColumnDelay;
-                            
-                            pr.Start = NumberOfCycles + 2;
-                            pr.End = pr.Start + RowDelay - 1;
-                            pr.Command = "DRAM: Writeback row " + to_string(RowBuffer);
-                            Command.push_back(pr);
-                            
-                            pr.Start = pr.End + 1;
-                            pr.End = pr.Start + RowDelay - 1;
-                            pr.Command = "DRAM: Activate row " + to_string(ins.row);
-                            Command.push_back(pr);
-                            
-                            pr.Start = pr.End + 1;
-                            pr.End = pr.Start + ColumnDelay -1;
-                            pr.Command = "DRAM: Column Access";
-                            
-                            if(ins.op == "lw")pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
-                            else pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
-                            
-                            Command.push_back(pr);
-                            RowBuffer = ins.row;
-                        }
-                    }
-
-                    // RegisterUpdation[ins.target] = RegisterUpdation[ins.source1] = EndTime;
-                    if(ins.op == "lw"){
-                        RegisterUpdation[ins.target] = EndTime;
-                        RegisterUse[ins.source1] = EndTime;
-                    }
-                    else{
-                        RegisterUse[ins.target] = EndTime;
-                        RegisterUse[ins.source1] = EndTime;
-                    }
-                    
-                    
-                    if(ins.op == "lw")reg[ins.target] = Dram[RowNumber][ColumnNumber];
-                    else {Dram[RowNumber][ColumnNumber] = reg[ins.target]; RowBufferUpdates++;}
-                    
-                    NumberOfCycles++; // Will take 1 cycle to read instruciton.
-                }
-
-                else {NumberOfCycles = EndTime; continue;}                            
-            
-            }
-            else {
+            if(x >= MemoryAvailable){  // Equality because of 4 bytes after x
                 flag = true;
                 print_msg = "ERROR : Overflow\n";
                 return;
             }
-            if(!Part2)NumberOfCycles = EndTime;   // For Part1, No instruction can be skipped.
+            
+            for(int i=0;i<4;i++)ins.dependent.pb(mp(-1,-1)); // Initializing length to 4for(int i=0;i<4;i++)ins.dependent.pb(-1); // Initializing length to 4
+
+            if(RowBuffer == -1 || RowBuffer != ins.row){
+                                
+                if(ins.op == "lw"){
+
+                    if(RegisterUpdation[ins.source1].ff >= 0 || MemoryUpdation[x].ff >=0 || RegisterUse[ins.target].ff >=0 || RegisterUpdation[ins.target].ff >= 0){
+                        // This implies the current instruction is dependent on some instruction already present in the Queue
+                        ins.dependent[0] = RegisterUpdation[ins.source1];
+                        ins.dependent[1] = MemoryUpdation[x];
+                        ins.dependent[2] = RegisterUse[ins.target];
+                        ins.dependent[3] = RegisterUpdation[ins.target];
+                    }
+
+                    RegisterUse[ins.source1] = mp(i,QueueInstruction.size());
+                    RegisterUpdation[ins.target] = mp(i,QueueInstruction.size());
+                    MemoryUse[x] = mp(i,QueueInstruction.size());
+                }
+
+                else{
+
+                    if(RegisterUpdation[ins.source1].ff >= 0 || MemoryUpdation[x].ff >=0 || MemoryUse[x].ff >=0 || RegisterUpdation[ins.target].ff >= 0){
+                        ins.dependent[0] = RegisterUpdation[ins.source1];
+                        ins.dependent[1] = MemoryUpdation[x];
+                        ins.dependent[2] = MemoryUse[x];
+                        ins.dependent[3] = RegisterUpdation[ins.target];
+                    }
+
+                    MemoryUpdation[x] = mp(i,QueueInstruction.size());
+                    RegisterUse[ins.source1] = mp(i,QueueInstruction.size());
+                    RegisterUse[ins.target] = mp(i,QueueInstruction.size());
+
+                }
+
+                QueueInstruction.pb(ins);
+
+            }  
+
+            else{
+                // This else block implies the current lw/sw instruction access the same row as in Buffer.
+                if(ins.op == "lw"){
+
+                    if(RegisterUpdation[ins.source1].ff >= 0 || MemoryUpdation[x].ff >=0 || RegisterUse[ins.target].ff >=0 || RegisterUpdation[ins.target].ff >= 0){
+                        // This implies the current instruction is dependent on some instruction already present in the Queue
+                        ins.dependent[0] = RegisterUpdation[ins.source1];
+                        ins.dependent[1] = MemoryUpdation[x];
+                        ins.dependent[2] = RegisterUse[ins.target];
+                        ins.dependent[3] = RegisterUpdation[ins.target];
+                        
+                        RegisterUse[ins.source1] = mp(i,QueueInstruction.size());
+                        RegisterUpdation[ins.target] = mp(i,QueueInstruction.size());
+                        MemoryUse[x] = mp(i,QueueInstruction.size());
+                        QueueInstruction.pb(ins);
+                    }
+                    else{
+                        // Execute the command 
+                        PrintCommand pr;
+                        pr.Start = pr.End = NumberOfCycles + 1;
+                        pr.Command = ins.original;
+                        pr.Execution = "DRAM: Request Issued";
+                        Command.pb(pr);
+
+                        pr.Execution = "";
+                        pr.Start = NumberOfCycles + 2;
+                        pr.End = pr.Start + ColumnDelay - 1;
+                        pr.Command = "DRAM: Column Access";                        
+                        pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+                        reg[ins.target] = Dram[RowNumber][ColumnNumber];
+                        Command.pb(pr);
+                        NumberOfCycles = pr.End;
+                    }
+
+                }
+
+                else{
+
+                    if(RegisterUpdation[ins.source1].ff >= 0 || MemoryUpdation[x].ff >=0 || MemoryUse[x].ff >=0 || RegisterUpdation[ins.target].ff >= 0){
+                        ins.dependent[0] = RegisterUpdation[ins.source1];
+                        ins.dependent[1] = MemoryUpdation[x];
+                        ins.dependent[2] = MemoryUse[x];
+                        ins.dependent[3] = RegisterUpdation[ins.target];
+
+                        MemoryUpdation[x] = mp(i,QueueInstruction.size());
+                        RegisterUse[ins.source1] = mp(i,QueueInstruction.size());
+                        RegisterUse[ins.target] = mp(i,QueueInstruction.size());
+                        QueueInstruction.pb(ins);
+                    }
+                    else{
+                        // Execute the command
+                        PrintCommand pr;
+                        pr.Start = pr.End = NumberOfCycles + 1;
+                        pr.Command = ins.original;
+                        pr.Execution = "DRAM: Request Issued";
+                        Command.pb(pr);
+
+                        pr.Execution = "";
+                        pr.Start = NumberOfCycles + 2;
+                        pr.End = pr.Start + ColumnDelay - 1;
+                        pr.Command = "DRAM: Column Access";                        
+                        pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
+
+                        if(Dram[RowNumber][ColumnNumber] != reg[ins.target])RowBufferUpdates++;
+                        Dram[RowNumber][ColumnNumber] = reg[ins.target];
+                        Command.pb(pr);
+                        NumberOfCycles = pr.End;
+                    }
+                }
+
+            }      
             i++;
+            
+
+//             PrintCommand pr;
+
+//             // INCORPORATE THIS COMMAND ALSO ( COMMENTING AS OF NOW ) 
+// // -------------------------------------------------------------------------------------------------------------------------
+// // -------------------------------------------------------------------------------------------------------------------------
+// // -------------------------------------------------------------------------------------------------------------------------
+// // -------------------------------------------------------------------------------------------------------------------------
+// // -------------------------------------------------------------------------------------------------------------------------
+// // -------------------------------------------------------------------------------------------------------------------------
+
+//             // pr.Start = pr.End = NumberOfCycles + 1;
+//             // pr.Command = ins.original;
+//             // pr.Execution = "DRAM: Request Issued";
+//             // Command.pb(pr);
+//             // pr.Execution = "";
+
+//             if(RowBuffer == ins.row){
+                
+//                 // If same row in buffer First check whether it is safe to execute the instruction or not
+//                 pr.Start = pr.End = NumberOfCycles + 1;
+//                 pr.Command = ins.original;
+//                 pr.Execution = "DRAM: Request Issued";
+//                 Command.pb(pr);
+                
+//                 pr.Execution = "";
+//                 pr.Start = NumberOfCycles + 2;
+//                 pr.End = pr.Start + ColumnDelay - 1;
+//                 pr.Command = "DRAM: Column Access";                        
+//                 if(ins.op == "lw"){
+//                     pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+//                 }
+//                 else{
+//                     pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
+//                 }
+//                 Command.pb(pr);
+                
+//                 StartTime = NumberOfCycles+2;
+//                 EndTime = NumberOfCycles + 1 + ColumnDelay;
+//             }
+
+//             else if(RowBuffer == -1){ // have to initiate the process
+                
+//                 RowBufferUpdates++;
+                
+//                 StartTime = NumberOfCycles + 2;
+//                 EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
+//                 pr.Start = NumberOfCycles + 2;
+//                 pr.End = pr.Start + RowDelay - 1;
+//                 pr.Command = "DRAM: Activate row " + to_string(ins.row);
+//                 Command.pb(pr);
+//                 pr.Start = pr.End + 1;
+//                 pr.End = pr.Start + ColumnDelay -1;
+//                 pr.Command = "DRAM: Column Access";
+//                 if(ins.op == "lw"){
+//                     pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+//                 }
+//                 else{
+//                     pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
+//                 }
+//                 Command.pb(pr);
+//                 RowBuffer = ins.row;
+//                 RowBufferCopy = Dram[ins.row];
+//             }
+
+//             else{
+//                 // ins.row is the New Row
+//                 // RowBuffer is the one which is in the Buffer
+//                 RowBufferUpdates++;
+//                 if(RowBufferCopy == Dram[ins.row]){
+//                     // No need to writeback if there is no updation in the row
+                    
+//                     StartTime = NumberOfCycles + 2;
+//                     EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
+
+//                     pr.Start = NumberOfCycles + 2;
+//                     pr.End = pr.Start + RowDelay - 1;
+//                     pr.Command = pr.Command = "DRAM: Activate row " + to_string(ins.row);
+//                     Command.pb(pr);
+                    
+//                     pr.Start = pr.End + 1;
+//                     pr.End = pr.Start + ColumnDelay - 1;
+//                     pr.Command = "DRAM: Column Access";
+                    
+//                     if(ins.op == "lw")pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+//                     else pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
+                    
+//                     Command.pb(pr);
+//                     RowBuffer = ins.row;
+//                 }
+//                 else{
+//                     // Some changes took place in the Row Buffer, hence, we need to writeback that row to the DRAM
+//                     StartTime = NumberOfCycles + 2;
+//                     EndTime = NumberOfCycles + 1 + RowDelay*2 + ColumnDelay;
+                    
+//                     pr.Start = NumberOfCycles + 2;
+//                     pr.End = pr.Start + RowDelay - 1;
+//                     pr.Command = "DRAM: Writeback row " + to_string(RowBuffer);
+//                     Command.pb(pr);
+                    
+//                     pr.Start = pr.End + 1;
+//                     pr.End = pr.Start + RowDelay - 1;
+//                     pr.Command = "DRAM: Activate row " + to_string(ins.row);
+//                     Command.pb(pr);
+                    
+//                     pr.Start = pr.End + 1;
+//                     pr.End = pr.Start + ColumnDelay -1;
+//                     pr.Command = "DRAM: Column Access";
+                    
+//                     if(ins.op == "lw")pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
+//                     else pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
+                    
+//                     Command.pb(pr);
+//                     RowBuffer = ins.row;
+//                 }
+//             }
+
+            // RegisterUpdation[ins.target] = RegisterUpdation[ins.source1] = EndTime;
+            // if(ins.op == "lw"){
+            //     RegisterUpdation[ins.target] = EndTime;
+            //     RegisterUse[ins.source1] = EndTime;
+            // }
+            // else{
+            //     RegisterUse[ins.target] = EndTime;
+            //     RegisterUse[ins.source1] = EndTime;
+            // }
+            
+            
+            // if(ins.op == "lw")reg[ins.target] = Dram[RowNumber][ColumnNumber];
+            // else {Dram[RowNumber][ColumnNumber] = reg[ins.target]; RowBufferUpdates++;}
+            
+            // NumberOfCycles++; // Will take 1 cycle to read instruciton.
+
+
+            // if(!Part2)NumberOfCycles = EndTime;   // For Part1, No instruction can be skipped.
+            // i++;
+        
         }
 
         else if(ins.op == "addi"){
@@ -548,9 +836,9 @@ void parse(){
             }
             else{  // First symbol is $ and is present in Register file
                 x = reg[ins.source1];
-                if(RegisterUpdation[ins.source1] > NumberOfCycles){
-                    NumberOfCycles = EndTime;
-                    continue;
+                if(RegisterUpdation[ins.source1].ff >=0){
+                    ResolveDependency(QueueInstruction[RegisterUpdation[ins.source1].ss]);
+                    // continue;
                 }
             }
             // cout << ins.source1 << " " << ins.source2 << endl;
@@ -566,17 +854,17 @@ void parse(){
             }
             else{  // First symbol is $ and is present in Register file
                 y = reg[ins.source2];
-                if(RegisterUpdation[ins.source1] > NumberOfCycles){
-                    NumberOfCycles = EndTime;
-                    continue;
+                if(RegisterUpdation[ins.source2].ff >=0){
+                    ResolveDependency(QueueInstruction[RegisterUpdation[ins.source2].ss]);
+                    // continue;
                 }
             }
 
             // cout << "Hey  "  << ins.target << "  " <<  NumberOfCycles <<   "\n" ;
 
-            if(RegisterUpdation[ins.target] > NumberOfCycles || RegisterUse[ins.target] > NumberOfCycles){
-                NumberOfCycles = EndTime;
-                continue;
+            if(RegisterUpdation[ins.target].ff >=0 || RegisterUse[ins.target].ff >=0){
+                ResolveDependency(QueueInstruction[RegisterUpdation[ins.target].ss]);
+                // continue;
             }
 
             PrintCommand pr;
@@ -585,12 +873,13 @@ void parse(){
             pr.Command = ins.original;
             reg[ins.target] = x+y;
             pr.Execution = ins.target + " = " + to_string(reg[ins.target]);
-            Command.push_back(pr);
+            Command.pb(pr);
             
             i++;
             NumberOfCycles++;
         }
-        else i++; //  This is for the labels like "main:" which will not be covered in any if the cases above.  
+        
+        else i++; //  This is for the labels like "main:" or "loop:" which will not be covered in any if the cases above and nor the NumberOfCycles will be incremented on this  
 
         // if(ins.op!="")
         // {
@@ -636,7 +925,7 @@ int main(int argc, char * argv[]){
             int ln=1;
             
             for(string line;getline(infile,line);){
-                text_file.push_back(line);
+                text_file.pb(line);
                 tokenize(line);
                 if(flag){
                     cout << print_msg;
@@ -664,13 +953,19 @@ int main(int argc, char * argv[]){
             }
             else{
                 
+
+                for(int i=QueueInstruction.size()-1;i>=0;i--){
+                    // cout << (QueueInstruction.size()) << endl;
+                    // print_ins(QueueInstruction[i]);
+                    ResolveDependency(QueueInstruction[i]);
+                }
                 
                 if(RowBuffer != -1 && RowBufferCopy != Dram[RowBuffer]){
                     PrintCommand pr;
                     pr.Start = Command[Command.size()-1].End + 1;
                     pr.End = pr.Start + RowDelay - 1;
                     pr.Command = "DRAM: Writeback row " + to_string(RowBuffer);
-                    Command.push_back(pr);
+                    Command.pb(pr);
                 }
                 sort(Command.begin(),Command.end(),Comparator);
                 if(Part2)cout << "PART 2\n\n";
