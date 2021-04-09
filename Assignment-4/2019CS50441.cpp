@@ -68,19 +68,12 @@ struct instruction{
     // Kind of instructions will also vary with lw, sw
 };
 
-// struct QueueInstruction{
-//     instruction ins;
-//     vector<int> dependent; // Can be of length at most 4.
-// };
-
 vector<instruction> instr;
 vector<PrintCommand> Command;
+vector<instruction> QueueInstruction; // Also need to check whether a particular address is in use and whether it is accessed again
 
-// Also need to check whether a particular address is in use and whether it is accessed again
-vector<instruction> QueueInstruction;
 
 // First job is to parse over the file and store the instructions in instruction memory 
-
 string strip(string s){
     // cout << "->" << s << "<-\n";
     int start=0;
@@ -353,8 +346,6 @@ void ResolveDependency(instruction &ins){
         }
         Command.push_back(pr);
         NumberOfCycles = pr.End;
-        // ClockCounter.push_back(make_pair(NumberOfCycles + 1,NumberOfCycles + ColumnDelay ));
-        // CommandCounter.push_back("DRAM : Column Access");
         // StartTime = NumberOfCycles+2;
         // EndTime = NumberOfCycles + 1 + ColumnDelay;
     }
@@ -513,8 +504,6 @@ void parse(){
             Command.pb(pr);
             i++;
             NumberOfCycles++;
-            // ClockCounter.pb(mp(NumberOfCycles+1, NumberOfCycles+1));
-            // CommandCounter.pb(ins.original);
             
         }
 
@@ -729,144 +718,7 @@ void parse(){
                 }
 
             }      
-            i++;
-            
-
-//             PrintCommand pr;
-
-//             // INCORPORATE THIS COMMAND ALSO ( COMMENTING AS OF NOW ) 
-// // -------------------------------------------------------------------------------------------------------------------------
-// // -------------------------------------------------------------------------------------------------------------------------
-// // -------------------------------------------------------------------------------------------------------------------------
-// // -------------------------------------------------------------------------------------------------------------------------
-// // -------------------------------------------------------------------------------------------------------------------------
-// // -------------------------------------------------------------------------------------------------------------------------
-
-//             // pr.Start = pr.End = NumberOfCycles + 1;
-//             // pr.Command = ins.original;
-//             // pr.Execution = "DRAM: Request Issued";
-//             // Command.pb(pr);
-//             // pr.Execution = "";
-
-//             if(RowBuffer == ins.row){
-                
-//                 // If same row in buffer First check whether it is safe to execute the instruction or not
-//                 pr.Start = pr.End = NumberOfCycles + 1;
-//                 pr.Command = ins.original;
-//                 pr.Execution = "DRAM: Request Issued";
-//                 Command.pb(pr);
-                
-//                 pr.Execution = "";
-//                 pr.Start = NumberOfCycles + 2;
-//                 pr.End = pr.Start + ColumnDelay - 1;
-//                 pr.Command = "DRAM: Column Access";                        
-//                 if(ins.op == "lw"){
-//                     pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
-//                 }
-//                 else{
-//                     pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
-//                 }
-//                 Command.pb(pr);
-                
-//                 StartTime = NumberOfCycles+2;
-//                 EndTime = NumberOfCycles + 1 + ColumnDelay;
-//             }
-
-//             else if(RowBuffer == -1){ // have to initiate the process
-                
-//                 RowBufferUpdates++;
-                
-//                 StartTime = NumberOfCycles + 2;
-//                 EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
-//                 pr.Start = NumberOfCycles + 2;
-//                 pr.End = pr.Start + RowDelay - 1;
-//                 pr.Command = "DRAM: Activate row " + to_string(ins.row);
-//                 Command.pb(pr);
-//                 pr.Start = pr.End + 1;
-//                 pr.End = pr.Start + ColumnDelay -1;
-//                 pr.Command = "DRAM: Column Access";
-//                 if(ins.op == "lw"){
-//                     pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
-//                 }
-//                 else{
-//                     pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
-//                 }
-//                 Command.pb(pr);
-//                 RowBuffer = ins.row;
-//                 RowBufferCopy = Dram[ins.row];
-//             }
-
-//             else{
-//                 // ins.row is the New Row
-//                 // RowBuffer is the one which is in the Buffer
-//                 RowBufferUpdates++;
-//                 if(RowBufferCopy == Dram[ins.row]){
-//                     // No need to writeback if there is no updation in the row
-                    
-//                     StartTime = NumberOfCycles + 2;
-//                     EndTime = NumberOfCycles + 1 + RowDelay + ColumnDelay;
-
-//                     pr.Start = NumberOfCycles + 2;
-//                     pr.End = pr.Start + RowDelay - 1;
-//                     pr.Command = pr.Command = "DRAM: Activate row " + to_string(ins.row);
-//                     Command.pb(pr);
-                    
-//                     pr.Start = pr.End + 1;
-//                     pr.End = pr.Start + ColumnDelay - 1;
-//                     pr.Command = "DRAM: Column Access";
-                    
-//                     if(ins.op == "lw")pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
-//                     else pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
-                    
-//                     Command.pb(pr);
-//                     RowBuffer = ins.row;
-//                 }
-//                 else{
-//                     // Some changes took place in the Row Buffer, hence, we need to writeback that row to the DRAM
-//                     StartTime = NumberOfCycles + 2;
-//                     EndTime = NumberOfCycles + 1 + RowDelay*2 + ColumnDelay;
-                    
-//                     pr.Start = NumberOfCycles + 2;
-//                     pr.End = pr.Start + RowDelay - 1;
-//                     pr.Command = "DRAM: Writeback row " + to_string(RowBuffer);
-//                     Command.pb(pr);
-                    
-//                     pr.Start = pr.End + 1;
-//                     pr.End = pr.Start + RowDelay - 1;
-//                     pr.Command = "DRAM: Activate row " + to_string(ins.row);
-//                     Command.pb(pr);
-                    
-//                     pr.Start = pr.End + 1;
-//                     pr.End = pr.Start + ColumnDelay -1;
-//                     pr.Command = "DRAM: Column Access";
-                    
-//                     if(ins.op == "lw")pr.Execution = to_string(reg[ins.target]) + " = " + to_string(Dram[RowNumber][ColumnNumber]);
-//                     else pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
-                    
-//                     Command.pb(pr);
-//                     RowBuffer = ins.row;
-//                 }
-//             }
-
-            // RegisterUpdation[ins.target] = RegisterUpdation[ins.source1] = EndTime;
-            // if(ins.op == "lw"){
-            //     RegisterUpdation[ins.target] = EndTime;
-            //     RegisterUse[ins.source1] = EndTime;
-            // }
-            // else{
-            //     RegisterUse[ins.target] = EndTime;
-            //     RegisterUse[ins.source1] = EndTime;
-            // }
-            
-            
-            // if(ins.op == "lw")reg[ins.target] = Dram[RowNumber][ColumnNumber];
-            // else {Dram[RowNumber][ColumnNumber] = reg[ins.target]; RowBufferUpdates++;}
-            
-            // NumberOfCycles++; // Will take 1 cycle to read instruciton.
-
-
-            // if(!Part2)NumberOfCycles = EndTime;   // For Part1, No instruction can be skipped.
-            // i++;
+            i++;        
         
         }
 
@@ -964,16 +816,6 @@ void parse(){
 
 int main(int argc, char * argv[]){
     if(argc >= 2 && argc <= 4){
-        // if(!is_number(argv[2])){
-        //     cout << "Invalid Input: Part can only be 1 or 2\n";
-        //     return -1;
-        // }
-        // int PartNumber = stoi(argv[2]);
-        // if(PartNumber > 2 || PartNumber < 1){
-        //     cout << "Invalid Input: Part can only be 1 or 2\n";
-        //     return -1;
-        // }
-        // if(PartNumber == 2)Part2 = true;
         ifstream infile(argv[1]);
         if(argc >= 3){
             if(!is_number(argv[2])){
