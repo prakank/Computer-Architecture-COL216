@@ -44,6 +44,7 @@ int MemoryAvailable;
 
 bool Part2 = false;
 bool flag  = false;
+bool DesignDecision = false;
 vector<int> RowBufferCopy;
 map<string,string> MemoryContent;
 
@@ -296,6 +297,7 @@ void tokenize(string s){
         i=0;
         s="";
         while(i<tokens[1].size() && tokens[1][i]!='(' && (tokens[1][i] - '0' <= 9) && (tokens[1][i] - '0' >= 0) ){s+=tokens[1][i];i++;}
+        while(i<tokens[1].size() && (tokens[1][i]==' ' || tokens[1][i]=='\t'))i++;
         if(i == tokens[1].size() || tokens[1][i]!='('){flag=true;print_msg = "ERROR : Syntax Error\n";return;}
         ins.offset = s;
         ins.source1 = tokens[1].substr(i+1,tokens[1].size() - i - 2);
@@ -379,7 +381,7 @@ void ResolveDependency(instruction &ins){
         // ins.row is the New Row
         // RowBuffer is the one which is in the Buffer
         RowBufferUpdates++;
-        if(RowBufferCopy == Dram[RowBuffer]){
+        if(RowBufferCopy == Dram[RowBuffer] && DesignDecision){
             // No need to writeback if there is no updation in the row
             
             // StartTime = NumberOfCycles + 2;
@@ -440,14 +442,32 @@ void ResolveDependency(instruction &ins){
         RegisterUse[ins.source1] = mp(-1,-1);
         RegisterUse[ins.target] = mp(-1,-1);
         MemoryUpdation[x] = mp(-1,-1);
-        if(Dram[RowNumber][ColumnNumber] != reg[ins.target])RowBufferUpdates++;
+        // if(Dram[RowNumber][ColumnNumber]!=reg[ins.target])
+        RowBufferUpdates++;
         Dram[RowNumber][ColumnNumber] = reg[ins.target];
     }
     // NumberOfCycles++;
     ins.dependent[0] = mp(-2,-2); // This implies the particular instruction in the vector is executed
-    for(int i=QueueInstruction.size()-1;i>=0;i--){
+    
+    // for(int i=QueueInstruction.size()-1;i>=0;i--){
+    //     if(QueueInstruction[i].dependent[0].ff == -2)continue;
+    //     if(QueueInstruction[i].row == RowBuffer)ResolveDependency(QueueInstruction[i]);
+    // }
+    
+    for(int i=0;i<QueueInstruction.size();i++){
+
         if(QueueInstruction[i].dependent[0].ff == -2)continue;
-        if(QueueInstruction[i].row == RowBuffer)ResolveDependency(QueueInstruction[i]);
+        
+        for(int j=0;j<4;j++)if(QueueInstruction[i].dependent[j].ss>=0 && QueueInstruction[QueueInstruction[i].dependent[j].ss].dependent[0].ff == -2)QueueInstruction[i].dependent[j] = mp(-1,-1);
+        
+        if(QueueInstruction[i].row == RowBuffer){
+            bool flag = true;
+            for(int j=0;j<4;j++){
+                if(QueueInstruction[i].dependent[0].ff != -1)flag = false;
+            }
+            if(flag)ResolveDependency(QueueInstruction[i]);
+        }
+        // if(QueueInstruction[i].row == RowBuffer && QueueInstruction[i].dependent[0].ff == -1)ResolveDependency(QueueInstruction[i]);
     }
     return;
 
@@ -710,7 +730,8 @@ void parse(){
                         pr.Command = "DRAM: Column Access (" + to_string(ColumnNumber) + ")";                                             
                         pr.Execution = "Address " + to_string(x) +  "-" + to_string(x+3) + " = " + to_string(reg[ins.target]);
 
-                        if(Dram[RowNumber][ColumnNumber] != reg[ins.target])RowBufferUpdates++;
+                        // if(Dram[RowNumber][ColumnNumber] != reg[ins.target])
+                        RowBufferUpdates++;
                         Dram[RowNumber][ColumnNumber] = reg[ins.target];
                         Command.pb(pr);
                         NumberOfCycles = pr.End;
@@ -884,7 +905,7 @@ int main(int argc, char * argv[]){
                     ResolveDependency(QueueInstruction[i]);
                 }
                 
-                if(RowBuffer != -1 && RowBufferCopy != Dram[RowBuffer]){
+                if(RowBuffer != -1 && ( RowBufferCopy != Dram[RowBuffer] || !DesignDecision)){
                     PrintCommand pr;
                     pr.Start = Command[Command.size()-1].End + 1;
                     pr.End = pr.Start + RowDelay - 1;
@@ -918,13 +939,24 @@ int main(int argc, char * argv[]){
                     if( i->second != "0")
                     cout << i->first << ": " << i->second << "\n";
                 }
-                
+                cout << endl;
+                cout << boost::format("%-17s %-2s %5s") % "Operation Count" % " : " % print_count;
+                cout << endl;
+                for(auto i = InstructionCountVector.begin();i!=InstructionCountVector.end();i++){
+                    // cout << i->first << " " << i->second << endl;
+                    cout << boost::format("%-17s %-2s %5s") % i->first % " : " % i->second;
+                    cout << "\n";
+                }
+
                 cout << "\nInstruction Count : " << print_count  << endl;
                 cout << "Instruction Execution Count:\n";
                 int j = 1;
                 for(int i=0;i<instr.size();i++){
                     if(instr[i].original!=""){
-                        cout << j << ". " << instr[i].original << " : "  << instr[i].InstructionCount <<  "\n";
+                        string val1 = to_string(j) + ". ";
+                        // string val2 = instr[i].original + " : ";
+                        cout << boost::format("%-5s %-30s %-3s %-3s\n") % val1 % instr[i].original % "=>" % instr[i].InstructionCount;
+                        // cout << j << ". " << instr[i].original << " : "  << instr[i].InstructionCount <<  "\n";
                         j++;
                     }
                 }
