@@ -1,0 +1,74 @@
+ASSIGNMENT 4 BLOCKING
+
+ROW_ACCESS_DELAY: 10
+COLUMN_ACCESS_DELAY: 2
+Clock Cycles with Last Row Writeback(if any): 70
+
+Cycle Wise Analysis
+
+Cycle Count          Instruction                                             Register/Memory/Request                           
+Cycle 1:             addi $s0, $zero, 1000                                   $s0 = 1000                                        
+Cycle 2:             addi $s1, $zero, 2500                                   $s1 = 2500                                        
+Cycle 3:             addi $t0, $zero, 1                                      $t0 = 1                                           
+Cycle 4:             addi $t1, $zero, 2                                      $t1 = 2                                           
+Cycle 5:             addi $t2, $zero, 3                                      $t2 = 3                                           
+Cycle 6:             addi $t3, $zero, 4                                      $t3 = 4                                           
+Cycle 7:             sw $t4, 4($s1)                                          DRAM: Request Issued                              
+Cycle 8-17:          DRAM: Activate row 2      (Ins: sw $t4, 4($s1))                                                           
+Cycle 18-19:         DRAM: Column Access (456) (Ins: sw $t4, 4($s1))         Address 2504-2507 = 0                             
+Cycle 20:            sw $t1, 0($s1)                                          DRAM: Request Issued                              
+Cycle 21-22:         DRAM: Column Access (452) (Ins: sw $t1, 0($s1))         Address 2500-2503 = 2                             
+Cycle 23:            lw $t6, 0($s1)                                          DRAM: Request Issued                              
+Cycle 24-25:         DRAM: Column Access (452) (Ins: lw $t6, 0($s1))         $t6 = 2                                           
+Cycle 26:            lw $t8, 4($s1)                                          DRAM: Request Issued                              
+Cycle 27-28:         DRAM: Column Access (456) (Ins: lw $t8, 4($s1))         $t8 = 0                                           
+Cycle 29:            sw $t2, 4($s0)                                          DRAM: Request Issued                              
+Cycle 30-39:         DRAM: Writeback row 2                                                                                     
+Cycle 40-49:         DRAM: Activate row 0       (Ins: sw $t2, 4($s0))                                                          
+Cycle 50-51:         DRAM: Column Access (1004) (Ins: sw $t2, 4($s0))        Address 1004-1007 = 3                             
+Cycle 52:            sw $t0, 0($s0)                                          DRAM: Request Issued                              
+Cycle 53-54:         DRAM: Column Access (1000) (Ins: sw $t0, 0($s0))        Address 1000-1003 = 1                             
+Cycle 55:            lw $t5, 0($s0)                                          DRAM: Request Issued                              
+Cycle 56-57:         DRAM: Column Access (1000) (Ins: lw $t5, 0($s0))        $t5 = 1                                           
+Cycle 58:            lw $t7, 4($s0)                                          DRAM: Request Issued                              
+Cycle 59-60:         DRAM: Column Access (1004) (Ins: lw $t7, 4($s0))        $t7 = 3                                           
+Cycle 61-70:         DRAM: Writeback row 0                                                                                     
+======================================
+Program Execeuted Successfully
+======================================
+Program Statistics
+Row Buffer Updates : 6
+
+Memory Content
+1000-1003: 1
+1004-1007: 3
+2500-2503: 2
+
+Operation Count    :     14
+add                :      0
+addi               :      6
+beq                :      0
+bne                :      0
+j                  :      0
+lw                 :      4
+mul                :      0
+slt                :      0
+sub                :      0
+sw                 :      4
+
+Instruction Count : 14
+Instruction Execution Count:
+1.    addi $s0, $zero, 1000          =>  1  
+2.    addi $s1, $zero, 2500          =>  1  
+3.    addi $t0, $zero, 1             =>  1  
+4.    addi $t1, $zero, 2             =>  1  
+5.    addi $t2, $zero, 3             =>  1  
+6.    addi $t3, $zero, 4             =>  1  
+7.    sw $t0, 0($s0)                 =>  1  
+8.    sw $t1, 0($s1)                 =>  1  
+9.    sw $t2, 4($s0)                 =>  1  
+10.   sw $t4, 4($s1)                 =>  1  
+11.   lw $t5, 0($s0)                 =>  1  
+12.   lw $t6, 0($s1)                 =>  1  
+13.   lw $t7, 4($s0)                 =>  1  
+14.   lw $t8, 4($s1)                 =>  1  

@@ -1,0 +1,60 @@
+ASSIGNMENT 4 NON-BLOCKING
+
+ROW_ACCESS_DELAY: 10
+COLUMN_ACCESS_DELAY: 2
+Clock Cycles with Last Row Writeback(if any): 45
+
+Cycle Wise Analysis
+
+Cycle Count          Instruction                                             Register/Memory/Request                           
+Cycle 1:             sw $t4, 1024($zero)                                     DRAM: Request Issued                              
+Cycle 2:             addi $t4,$t4,12                                         $t4 = 12                                          
+Cycle 3:             add $t3, $t1, $t2                                       $t3 = 0                                           
+Cycle 4:             add $t3, $t1, $t2                                       $t3 = 0                                           
+Cycle 5:             add $t3, $t1, $t2                                       $t3 = 0                                           
+Cycle 6:             add $t3, $t1, $t2                                       $t3 = 0                                           
+Cycle 7:             add $t3, $t1, $t2                                       $t3 = 0                                           
+Cycle 8:             add $t3, $t1, $t2                                       $t3 = 0                                           
+Cycle 9:             add $t3, $t1, $t2                                       $t3 = 0                                           
+Cycle 10:            add $t3, $t1, $t2                                       $t3 = 0                                           
+Cycle 2-11:          DRAM: Activate row 1    (Ins: sw $t4, 1024($zero))                                                        
+Cycle 11:            sw $t4, 1000($zero)                                     DRAM: Request Issued                              
+Cycle 12-13:         DRAM: Column Access (0) (Ins: sw $t4, 1024($zero))      Address 1024-1027 = 0                             
+Cycle 14-23:         DRAM: Writeback row 1                                                                                     
+Cycle 24-33:         DRAM: Activate row 0       (Ins: sw $t4, 1000($zero))                                                     
+Cycle 34-35:         DRAM: Column Access (1000) (Ins: sw $t4, 1000($zero))   Address 1000-1003 = 12                            
+Cycle 36-45:         DRAM: Writeback row 0                                                                                     
+======================================
+Program Execeuted Successfully
+======================================
+Program Statistics
+Row Buffer Updates : 4
+
+Memory Content
+1000-1003: 12
+
+Operation Count    :     11
+add                :      8
+addi               :      1
+beq                :      0
+bne                :      0
+j                  :      0
+lw                 :      0
+mul                :      0
+slt                :      0
+sub                :      0
+sw                 :      2
+
+Instruction Count : 11
+Instruction Execution Count:
+1.    sw $t4, 1024($zero)            =>  1  
+2.    addi $t4,$t4,12                =>  1  
+3.    add $t3, $t1, $t2              =>  1  
+4.    add $t3, $t1, $t2              =>  1  
+5.    add $t3, $t1, $t2              =>  1  
+6.    add $t3, $t1, $t2              =>  1  
+7.    add $t3, $t1, $t2              =>  1  
+8.    add $t3, $t1, $t2              =>  1  
+9.    add $t3, $t1, $t2              =>  1  
+10.   add $t3, $t1, $t2              =>  1  
+11.   sw $t4, 1000($zero)            =>  1  

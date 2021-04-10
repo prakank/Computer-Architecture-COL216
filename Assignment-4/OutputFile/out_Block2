@@ -1,0 +1,111 @@
+ASSIGNMENT 4 BLOCKING
+
+ROW_ACCESS_DELAY: 10
+COLUMN_ACCESS_DELAY: 2
+Clock Cycles with Last Row Writeback(if any): 99
+
+Cycle Wise Analysis
+
+Cycle Count          Instruction                                             Register/Memory/Request                           
+Cycle 1:             addi $s0, $zero, 1000                                   $s0 = 1000                                        
+Cycle 2:             addi $s5, $s5, 10000                                    $s5 = 10000                                       
+Cycle 3:             addi $s1, $zero, 0                                      $s1 = 0                                           
+Cycle 4:             addi $s2, $zero, 2                                      $s2 = 2                                           
+Cycle 5:             addi $t1, $zero, 0                                      $t1 = 0                                           
+Cycle 6:             addi $t1, $t1, 1                                        $t1 = 1                                           
+Cycle 7:             sw $t1, 0($s0)                                          DRAM: Request Issued                              
+Cycle 8-17:          DRAM: Activate row 0       (Ins: sw $t1, 0($s0))                                                          
+Cycle 18-19:         DRAM: Column Access (1000) (Ins: sw $t1, 0($s0))        Address 1000-1003 = 1                             
+Cycle 20:            addi $s0, $s0, 4                                        $s0 = 1004                                        
+Cycle 21:            addi $s1, $s1, 1                                        $s1 = 1                                           
+Cycle 22:            slt $s3, $s1, $s2                                       $s3 = 1                                           
+Cycle 23:            bne $s3, $zero, initloop                                Values Mismatched : Jump to initloop              
+Cycle 24:            addi $t1, $t1, 1                                        $t1 = 2                                           
+Cycle 25:            sw $t1, 0($s0)                                          DRAM: Request Issued                              
+Cycle 26-27:         DRAM: Column Access (1004) (Ins: sw $t1, 0($s0))        Address 1004-1007 = 2                             
+Cycle 28:            addi $s0, $s0, 4                                        $s0 = 1008                                        
+Cycle 29:            addi $s1, $s1, 1                                        $s1 = 2                                           
+Cycle 30:            slt $s3, $s1, $s2                                       $s3 = 0                                           
+Cycle 31:            bne $s3, $zero, initloop                                Values Matched : Move to next instruction         
+Cycle 32:            addi $s0, $zero, 1000                                   $s0 = 1000                                        
+Cycle 33:            addi $s1, $zero, 0                                      $s1 = 0                                           
+Cycle 34:            addi $s3, $zero, 0                                      $s3 = 0                                           
+Cycle 35:            addi $s2, $zero, 2                                      $s2 = 2                                           
+Cycle 36:            lw $t0, 0($s0)                                          DRAM: Request Issued                              
+Cycle 37-38:         DRAM: Column Access (1000) (Ins: lw $t0, 0($s0))        $t0 = 1                                           
+Cycle 39:            addi $s0, $s0, 4                                        $s0 = 1004                                        
+Cycle 40:            lw $t1, 0($s0)                                          DRAM: Request Issued                              
+Cycle 41-42:         DRAM: Column Access (1004) (Ins: lw $t1, 0($s0))        $t1 = 2                                           
+Cycle 43:            add $t2, $t0, $t1                                       $t2 = 3                                           
+Cycle 44:            sw $t2, 0($s0)                                          DRAM: Request Issued                              
+Cycle 45-46:         DRAM: Column Access (1004) (Ins: sw $t2, 0($s0))        Address 1004-1007 = 3                             
+Cycle 47:            addi $s1, $s1, 1                                        $s1 = 1                                           
+Cycle 48:            slt $s3, $s1, $s2                                       $s3 = 1                                           
+Cycle 49:            bne $s3, $zero, sumloop                                 Values Mismatched : Jump to sumloop               
+Cycle 50:            lw $t0, 0($s0)                                          DRAM: Request Issued                              
+Cycle 51-52:         DRAM: Column Access (1004) (Ins: lw $t0, 0($s0))        $t0 = 3                                           
+Cycle 53:            addi $s0, $s0, 4                                        $s0 = 1008                                        
+Cycle 54:            lw $t1, 0($s0)                                          DRAM: Request Issued                              
+Cycle 55-56:         DRAM: Column Access (1008) (Ins: lw $t1, 0($s0))        $t1 = 0                                           
+Cycle 57:            add $t2, $t0, $t1                                       $t2 = 3                                           
+Cycle 58:            sw $t2, 0($s0)                                          DRAM: Request Issued                              
+Cycle 59-60:         DRAM: Column Access (1008) (Ins: sw $t2, 0($s0))        Address 1008-1011 = 3                             
+Cycle 61:            addi $s1, $s1, 1                                        $s1 = 2                                           
+Cycle 62:            slt $s3, $s1, $s2                                       $s3 = 0                                           
+Cycle 63:            bne $s3, $zero, sumloop                                 Values Matched : Move to next instruction         
+Cycle 64:            sw $t7, 0 ($s5)                                         DRAM: Request Issued                              
+Cycle 65-74:         DRAM: Writeback row 0                                                                                     
+Cycle 75-84:         DRAM: Activate row 9      (Ins: sw $t7, 0 ($s5))                                                          
+Cycle 85-86:         DRAM: Column Access (784) (Ins: sw $t7, 0 ($s5))        Address 10000-10003 = 0                           
+Cycle 87:            sw $t7, 0 ($s5)                                         DRAM: Request Issued                              
+Cycle 88-89:         DRAM: Column Access (784) (Ins: sw $t7, 0 ($s5))        Address 10000-10003 = 0                           
+Cycle 90-99:         DRAM: Writeback row 9                                                                                     
+======================================
+Program Execeuted Successfully
+======================================
+Program Statistics
+Row Buffer Updates : 8
+
+Memory Content
+1000-1003: 1
+1004-1007: 3
+1008-1011: 3
+
+Operation Count    :     39
+add                :      2
+addi               :     19
+beq                :      0
+bne                :      4
+j                  :      0
+lw                 :      4
+mul                :      0
+slt                :      4
+sub                :      0
+sw                 :      6
+
+Instruction Count : 39
+Instruction Execution Count:
+1.    addi $s0, $zero, 1000          =>  1  
+2.    addi $s5, $s5, 10000           =>  1  
+3.    addi $s1, $zero, 0             =>  1  
+4.    addi $s2, $zero, 2             =>  1  
+5.    addi $t1, $zero, 0             =>  1  
+6.    addi $t1, $t1, 1               =>  2  
+7.    sw $t1, 0($s0)                 =>  2  
+8.    addi $s0, $s0, 4               =>  2  
+9.    addi $s1, $s1, 1               =>  2  
+10.   sw $t7, 0 ($s5)                =>  2  
+11.   slt $s3, $s1, $s2              =>  2  
+12.   bne $s3, $zero, initloop       =>  2  
+13.   addi $s0, $zero, 1000          =>  1  
+14.   addi $s1, $zero, 0             =>  1  
+15.   addi $s3, $zero, 0             =>  1  
+16.   addi $s2, $zero, 2             =>  1  
+17.   lw $t0, 0($s0)                 =>  2  
+18.   addi $s0, $s0, 4               =>  2  
+19.   lw $t1, 0($s0)                 =>  2  
+20.   add $t2, $t0, $t1              =>  2  
+21.   sw $t2, 0($s0)                 =>  2  
+22.   addi $s1, $s1, 1               =>  2  
+23.   slt $s3, $s1, $s2              =>  2  
+24.   bne $s3, $zero, sumloop        =>  2  
