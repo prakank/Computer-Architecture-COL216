@@ -4,6 +4,8 @@ ROW_ACCESS_DELAY = 10
 COLUMN_ACCESS_DELAY = 2
 CPU = 2
 INPUT = input
+SRC_DIR = ./InputFile
+OUT_DIR = ./OutputFile
 
 all: build run
 

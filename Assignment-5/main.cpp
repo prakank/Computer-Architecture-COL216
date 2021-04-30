@@ -1,262 +1,7 @@
-#include "main.h"
-#include "functions.hpp"
-
-#include<iostream>
-#include<fstream>
-#include<vector>
-#include<string>
-#include<iomanip>
-#include<map>
-#include<queue>
-#include<sstream>
-#include<boost/algorithm/string.hpp>
-#include<boost/format.hpp> 
-
-#define ff first
-#define pb push_back
-#define ss second
-#define mp make_pair
-#define pii pair<int,int>
-#define printp(x) cout << "(" <<  x.ff << "," << x.ss << ") "
-
-using namespace std;
-
-
-map<int,pair<int,int> > MemoryUpdation, MemoryUse;
-
-
-
-vector<vector<int> > Dram; // Dynamic Random Access Memory
-
-int RowDelay           = 10;
-int ColumnDelay        = 2;
-int TotalMemory_4Bytes = 1048576;
-int RowMemory          = 1024;
-int ColumnMemory       = 1024;
-/* int RowBuffer          = -1;*/                   // Assumption - We have only 1 Row Buffer (otherwise, we could have used an array)
-                                               // Also defined a vector named RowBufferCopy to store the orginal copy of row copied to row buffer
-
-int TotalMemory        = TotalMemory_4Bytes/4;
-
-
-int NumberOfCycles     = 0;
-int StartTime          = -1;
-int EndTime            = -1;
-/* int RowBufferUpdates   = 0; */
-int MemoryAvailable;
-
-// Assignment-5
-int CPU = 2;
-string BaseFilename = "t";
-
-
-// Assignment-5
-
-bool Part2 = false;
-bool flag  = false;
-bool DesignDecision = false;
-vector<int> RowBufferCopy;
-map<string,string> MemoryContent;
-
-struct PrintCommand{
-    int Start = -1;
-    int End = -1;
-    string Command = "";
-    string Execution = "";
-};
-
-struct instruction{
-    string op="",target="",source1="",source2="";
-    string jump = "";
-    string offset = "";
-    string fun_label="";
-    string original = "";
-    int InstructionCount = 0;
-    int InstructionRead = -1;
-    int row = -1;
-    vector<pair<int,int> > dependent; // Can be of length at most 4.
-    // Different index will contain different instructions 
-    // Kind of instructions will also vary with lw, sw
-};
-
-
-
- // Also need to check whether a particular address is in use and whether it is accessed again
-
-// string strip(string s);
-// bool Comparator(PrintCommand a, PrintCommand b);
-// bool is_number(const string& s);
-
-// void std_registers();
-// void AllotMemory();
-// void tokenize(string s);
-// void parse();
-// void ResolveDependency(instruction &ins);
-
-// void print_reg();
-// void print_ins(instruction ins);
-// void print_map(map<string,int> m);
-// void print_command_debug(PrintCommand pc);
-// void print_command(PrintCommand pc);
-
-
-// First job is to parse over the file and store the instructions in instruction memory 
-
-bool Comparator(PrintCommand a, PrintCommand b){
-    if(a.End!=b.End)return a.End < b.End;
-    return a.Start < b.Start;
-}
-
-bool is_number(const string& s)
-{
-    string::const_iterator it = s.begin();
-    if(*it=='-')it++;
-    while (it != s.end() && isdigit(*it)) ++it;
-    return !s.empty() && it == s.end();
-}
-
-class Registers{        
-    public:
-        
-        int print_count        = 0;
-        int ErrorLine          = -1;
-        int RowBuffer          = -1;
-        int NumberOfCycles     =  0;
-        int StartTime          = -1;
-        int EndTime            = -1;
-        int RowBufferUpdates   =  0;
-
-        string print_msg = "";
-        map<string,int> reg, label;
-        map<string,pair<int,int> > RegisterUpdation, RegisterUse;
-        map<string,int> InstructionCountVector;
-        vector<instruction> instr;
-        vector<instruction> QueueInstruction;
-        vector<PrintCommand> Command;
-
-        void std_registers();
-        
-        void print_reg();
-        void print_ins(instruction ins);
-        void print_map(map<string,int> m);
-        void print_command(PrintCommand pc);
-        
-        void tokenize(string s);
-        bool AllotMemory();
-        void parse();
-        bool ParsingExecution(string File);
-        void ResolveDependency(instruction &ins);
-        void Printing();
-        
-        string strip(string s);
-        
-};
+#include "main.hpp"
+#include "HelperFunctions.hpp"
 
 vector<Registers> CPU_List;
-
-string Registers::strip(string s){
-    // cout << "->" << s << "<-\n";
-    int start=0;
-    while(start<s.size() && s[start] == ' ' || s[start] == '\t')start++; // removing whitespace from tokens
-    if(start == s.size()){flag=true;print_msg = "ERROR : Syntax Error\n";return "";}
-    int end = s.size()-1;
-    while(end >= 0 && s[end] == ' ' || s[end] == '\t')end--;
-    string s_new = s.substr(start,end-start+1);
-    return s_new;
-}
-
-
-// Initalize std_registers() of class registers
-void Registers::std_registers(){
-
-    // Standard QTSPIM registers
-    reg["$zero"]   =0; reg["$at"]=0; reg["$v0"]=0; reg["$v1"]=0; 
-    reg  ["$a0"]   =0; reg["$a1"]=0; reg["$a2"]=0; reg["$a3"]=0; 
-    reg  ["$t0"]   =0; reg["$t1"]=0; reg["$t2"]=0; reg["$t3"]=0; reg["$t4"]=0; reg["$t5"]=0; reg["$t6"]=0; reg["$t7"]=0;
-    reg  ["$s0"]   =0; reg["$s1"]=0; reg["$s2"]=0; reg["$s3"]=0; reg["$s4"]=0; reg["$s5"]=0; reg["$s6"]=0; reg["$s7"]=0;
-    reg  ["$t8"]   =0; reg["$t9"]=0; reg["$k0"]=0; reg["$k1"]=0; reg["$gp"]=0; reg["$sp"]=0; reg["$fp"]=0; reg["$ra"]=0;
-
-    // reg["$t0"]=0;reg["$t1"]=0;reg["$t2"]=0;reg["$t3"]=0;reg["$t4"]=0;reg["$t5"]=0;reg["$t6"]=0;reg["$t7"]=0;reg["$t8"]=0;reg["$t9"]=0;
-    // reg["$s0"]=0;reg["$s1"]=0;reg["$s2"]=0;reg["$s3"]=0;reg["$s4"]=0;reg["$s5"]=0;reg["$s6"]=0;reg["$s7"]=0;reg["$s8"]=0;reg["$s9"]=0;
-    // reg["$r0"]=0;reg["$r1"]=0;reg["$r2"]=0;reg["$r3"]=0;reg["$r4"]=0;reg["$r5"]=0;reg["$r6"]=0;reg["$r7"]=0;reg["$r8"]=0;reg["$r9"]=0;
-    // reg["$v0"]=0;reg["$zero"]=0;
-
-    // reg["$r0"]=0;reg["$r1"]=0;reg["$r2"]=0;reg["$r3"]=0;reg["$r4"]=0;reg["$r5"]=0;reg["$r6"]=0;reg["$r7"]=0;reg["$r8"]=0;reg["$r9"]=0;
-    // reg["$r10"]=0;reg["$r11"]=0;reg["$r12"]=0;reg["$r13"]=0;reg["$r14"]=0;reg["$r15"]=0;reg["$r16"]=0;reg["$r17"]=0;reg["$r18"]=0;reg["$r19"]=0;
-    // reg["$r20"]=0;reg["$r21"]=0;reg["$r22"]=0;reg["$r23"]=0;reg["$r24"]=0;reg["$r25"]=0;reg["$r26"]=0;reg["$r27"]=0;reg["$r28"]=0;reg["$r29"]=0;
-    // reg["$r30"]=0;reg["$zero"]=0;
-
-    for(auto i = reg.begin(); i != reg.end(); i++){RegisterUpdation[i->ff] = mp(-1,-1); RegisterUse[i->ff] = mp(-1,-1);}
-
-    // Initializing the InstructionCountVector
-    InstructionCountVector["add"] = 0;
-    InstructionCountVector["addi"] = 0;
-    InstructionCountVector["sub"] = 0;
-    InstructionCountVector["mul"] = 0;
-    InstructionCountVector["beq"] = 0;
-    InstructionCountVector["bne"] = 0;
-    InstructionCountVector["slt"] = 0;
-    InstructionCountVector["j"] = 0;
-    InstructionCountVector["lw"] = 0;
-    InstructionCountVector["sw"] = 0;
-
-}
-
-
-void Registers::print_reg(){
-    int cnt = 0;
-    for (auto i = reg.begin(); i != reg.end(); i++){
-        stringstream ss;
-        ss << hex << i->second;
-        string res(ss.str());
-        cout << i->ff << ":" << res << ",   ";
-        // cout << res << " ";
-        cnt++;
-        if(cnt%10==0 || cnt==32)cout<<"\n";
-        // else cout<<", ";
-    }
-    cout << NumberOfCycles;
-    cout <<"\n";
-}
-
-void Registers::print_ins(instruction ins){
-    cout << "Op : ->" << ins.op << "<-\n";
-    cout << "Tar : ->" << ins.target << "<-\n";
-    cout << "Sou1 : ->" << ins.source1 << "<-\n";
-    cout << "Sou2 : ->" << ins.source2 << "<-\n";
-    cout << "Jump : ->" << ins.jump << "<-\n";
-    cout << "Jump_index : ->" << label[ins.jump] << "<-\n";
-    cout << "Off : ->" << ins.offset << "<-\n";
-    cout << "Fun_lable : ->" << ins.fun_label << "<-\n";
-    cout << "Dependency : "; printp(ins.dependent[0]) ; printp(ins.dependent[1]); printp(ins.dependent[2]) ; printp(ins.dependent[3]) ; cout << "\n";
-    cout << ins.target << " (Updation): " ;printp(RegisterUpdation[ins.target]); cout << " (Use): ";printp(RegisterUse[ins.target]);cout << "\n";
-    cout << ins.source1 << " (Updation): " ;printp(RegisterUpdation[ins.source1]); cout << " (Use): ";printp(RegisterUse[ins.source1]);cout << "\n";
-}
-
-void Registers::print_map(map<string,int> m){
-    for(auto i=m.begin(); i!=m.end();i++){
-        cout << "->" << i->ff << "<-->" << i->second <<"<-\n"; 
-    }
-}  
-
-bool Registers::AllotMemory(){
-    if(instr.size() <= TotalMemory){
-        
-        MemoryAvailable = 4*(TotalMemory - instr.size());
-        
-        TotalMemory = TotalMemory - instr.size(); // To account for multiple files        
-        
-        // Considered offset to be a multiple of 4
-        Dram.resize(RowMemory);
-        for(int i=0;i<RowMemory;i++)Dram[i].resize(ColumnMemory);
-    }
-    else {
-        cout << "ERROR : Insufficient Memory\n";
-        flag = true;
-        return false;
-    }
-    return true;
-}
 
 void Registers::tokenize(string s){
     instruction ins;
@@ -342,49 +87,6 @@ void Registers::tokenize(string s){
     
     instr.pb(ins);
 }
-
-
-void print_command_debug(PrintCommand pc){
-    cout << "Start : ->" << pc.Start << "<-\n";
-    cout << "End : ->" << pc.End << "<-\n";
-    cout << "Command : ->" << pc.Command << "<-\n\n";
-}
-
-void Registers::print_command(PrintCommand pc){
-    string s = "Cycle ";
-    if(pc.Start == pc.End){
-        s += to_string(pc.Start);
-        s += ":";
-    }
-    else if(pc.End < pc.Start){
-        s += to_string(pc.End);
-        s+=":";
-    }
-    else{
-        s += to_string(pc.Start) + "-" + to_string(pc.End);
-        s += ":";
-    }
-    
-    vector<string> countvector;
-    boost::split(countvector, pc.Command, boost::is_any_of(" "));
-    if(InstructionCountVector.find(countvector[0]) != InstructionCountVector.end()){
-        InstructionCountVector[countvector[0]]++;
-    }
-
-    cout << boost::format("%-20s %-55s %-50s\n") % s % pc.Command % pc.Execution;
-    if(pc.Execution!=""){
-        vector<string> temp;
-        boost::split(temp,pc.Execution,boost::is_any_of(" "));
-        if(temp[0] == "Address"){
-            MemoryContent[temp[1]] = temp[3];
-        }
-    }
-}
-
-// New Function Added
-// Recursive function to execute the instructions stored in queue.
-// This function will check for dependency of the current instruction it is called with, and will recursively exectue the instructions
-// to resolve the dependecy
 
 void Registers::ResolveDependency(instruction &ins){
     
@@ -580,11 +282,6 @@ void Registers::ResolveDependency(instruction &ins){
 
 }
 
-// Recursive function
-// New function added
-
-
-// Parse function is changed a bit (Rather than executing each lw/sw operation in sequence, appropriate if-else conditions decide whether to execute or store in the queue)
 void Registers::parse(){
     int i = 0;
     while(i<instr.size()){
@@ -706,7 +403,7 @@ void Registers::parse(){
         }
 
         else if(ins.op == "lw" || ins.op == "sw"){
-            if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || !is_number(ins.offset)){
+            if( reg.find(ins.target) == reg.end() || reg.find(ins.source1) == reg.end() || !Registers::is_number(ins.offset)){
                 flag = true;
                 print_msg = "ERROR : Unknown Register\n";
                 return;
@@ -747,7 +444,7 @@ void Registers::parse(){
                         ins.dependent[3] = RegisterUpdation[ins.target];
                     }
 
-                    RegisterUse[ins.source1] = mp(i,QueueInstruction.size());
+                    // RegisterUse[ins.source1] = mp(i,QueueInstruction.size());
                     RegisterUpdation[ins.target] = mp(i,QueueInstruction.size());
                     MemoryUse[x] = mp(i,QueueInstruction.size());
                 }
@@ -894,7 +591,7 @@ void Registers::parse(){
                 return;
             }            
             else if(ins.source1[0]!='$'){
-                flag = !is_number(ins.source1);
+                flag = !Registers::is_number(ins.source1);
                 if(flag){print_msg = "ERROR : Not a number\n"; return;}
                 x = stoi(ins.source1);
             }
@@ -915,7 +612,7 @@ void Registers::parse(){
             }            
             else if(ins.source2[0]!='$'){
                 
-                flag = !is_number(ins.source2);
+                flag = !Registers::is_number(ins.source2);
                 if(flag){print_msg = "ERROR : Not a number\n"; return;}                
                 y = stoi(ins.source2);
                 
@@ -1015,7 +712,7 @@ bool Registers::ParsingExecution(string File){
     for(int i=QueueInstruction.size()-1; i>=0; i--){
         ResolveDependency(QueueInstruction[i]);
     }
-    sort(Command.begin(),Command.end(),Comparator);
+    sort(Command.begin(),Command.end(),Registers::Comparator);
     if(RowBuffer != -1 && ( RowBufferCopy != Dram[RowBuffer] || !DesignDecision)){
         PrintCommand pr;
         pr.Start = Command[Command.size()-1].End + 1;
@@ -1026,66 +723,18 @@ bool Registers::ParsingExecution(string File){
     return true;
 }
 
-void Registers::Printing(){
 
-    cout << "ASSIGNMENT 5\n\n";
-    cout << "ROW_ACCESS_DELAY: " << RowDelay << "\n";
-    cout << "COLUMN_ACCESS_DELAY: " << ColumnDelay << "\n";
-    cout << "Clock Cycles with Last Row Writeback(if any): " << Command[Command.size()-1].End<< "\n\n";
-    cout << "Cycle Wise Analysis\n\n";
-    cout << boost::format("%-20s %-55s %-50s\n") % "Cycle Count" % "Instruction" % "Register/Memory/Request";
-    for(int i=0;i<Command.size();++i){
-        print_command(Command[i]);
-    }
-    cout << "======================================\n";
-    cout << "Program Execeuted Successfully\n";
-    cout << "======================================\n";
-    
-    cout << "Program Statistics\n";
-
-    cout << "Row Buffer Updates : " << RowBufferUpdates << endl;
-    
-    bool heading = false;
-    for(auto i = MemoryContent.begin();i!=MemoryContent.end();i++){
-        if(!heading)cout << "\nMemory Content\n";
-        heading = true;
-        if( i->second != "0")
-        cout << i->first << ": " << i->second << "\n";
-    }
-    cout << endl;
-    cout << boost::format("%-17s %-2s %5s") % "Operation Count" % " : " % print_count;
-    cout << endl;
-    for(auto i = InstructionCountVector.begin();i!=InstructionCountVector.end();i++){
-        // cout << i->first << " " << i->second << endl;
-        cout << boost::format("%-17s %-2s %5s") % i->first % " : " % i->second;
-        cout << "\n";
-    }
-
-    cout << "\nInstruction Count : " << print_count  << endl;
-    cout << "Instruction Execution Count:\n";
-    int j = 1;
-    for(int i=0;i<instr.size();i++){
-        if(instr[i].original!=""){
-            string val1 = to_string(j) + ". ";        
-            cout << boost::format("%-5s %-30s %-3s %-3s\n") % val1 % instr[i].original % "=>" % instr[i].InstructionCount;        
-            j++;
-        }
-    }
-    cout << "\n";
-}
 
 int main(int argc, char * argv[]){
     if(argc >= 2 && argc <= 4){
         
-        if(!is_number(argv[1])){
+        if(!Registers::is_number(argv[1])){
             cout << "INVALID INPUT: Number of Processors should be an Integer\n";
             return -1;
         }
-
-        CPU = stoi(argv[1]);
-
+        
         if(argc >= 3){
-            if(!is_number(argv[2])){
+            if(!Registers::is_number(argv[2])){
                 cout << "INVALID INPUT: ROW_ACCESS_DELAY should be an integer\n";
                 return -1;
             }
@@ -1093,21 +742,22 @@ int main(int argc, char * argv[]){
         }
 
         if(argc == 4){
-            if(!is_number(argv[3])){
+            if(!Registers::is_number(argv[3])){
                 cout << "INVALID INPUT: COLUMN_ACCESS_DELAY should be an integer\n";
                 return -1;
             }
             ColumnDelay = stoi(argv[3]);
         }        
-        
-        // cout << "Hey";
 
+        CPU = stoi(argv[1]);
+
+        // This loop ensures that all files are read and tokenized correctly
         for(int i=0; i<CPU; i++){
             string filename = BaseFilename + to_string(i+1);
             bool result = openFile(filename);
             if(!result)return -1;
         }
-
+        
         for(int i=0; i < CPU; i++){
             CPU_List[i].ParsingExecution(BaseFilename + to_string(i+1));
             CPU_List[i].Printing();
