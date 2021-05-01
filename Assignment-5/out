@@ -2,147 +2,120 @@ ASSIGNMENT 5
 
 ROW_ACCESS_DELAY: 10
 COLUMN_ACCESS_DELAY: 2
-Clock Cycles with Last Row Writeback(if any): 54
+Clock Cycles with Last Row Writeback(if any): 148
 
 Cycle Wise Analysis
 
-Cycle Count          Instruction                                             Register/Memory/Request                           
-Cycle 1:             addi $t1, $t1, 5                                        $t1 = 5                                           
-Cycle 2:             sw $t1, 2500 ($zero)                                    DRAM: Request Issued                              
-Cycle 3:             addi $t1, $t1, -1                                       $t1 = 4                                           
-Cycle 4:             lw $t2, 5000 ($zero)                                    DRAM: Request Issued                              
-Cycle 5:             beq $t1, $zero, label                                   Values Mismatched : Move to next instruction      
-Cycle 6:             j main                                                  Jump to main                                      
-Cycle 7:             addi $t1, $t1, -1                                       $t1 = 3                                           
-Cycle 8:             lw $t2, 5000 ($zero)                                    DRAM: Request Issued                              
-Cycle 9:             beq $t1, $zero, label                                   Values Mismatched : Move to next instruction      
-Cycle 10:            j main                                                  Jump to main                                      
-Cycle 11:            addi $t1, $t1, -1                                       $t1 = 2                                           
-Cycle 3-12:          DRAM: Activate row 2      (Ins: sw $t1, 2500 ($zero))                                                     
-Cycle 12:            lw $t2, 5000 ($zero)                                    DRAM: Request Issued                              
-Cycle 13:            beq $t1, $zero, label                                   Values Mismatched : Move to next instruction      
-Cycle 13-14:         DRAM: Column Access (452) (Ins: sw $t1, 2500 ($zero))   Address 2500-2503 = 5                             
-Cycle 14:            j main                                                  Jump to main                                      
-Cycle 15:            addi $t1, $t1, -1                                       $t1 = 1                                           
-Cycle 16:            lw $t2, 5000 ($zero)                                    DRAM: Request Issued                              
-Cycle 17:            beq $t1, $zero, label                                   Values Mismatched : Move to next instruction      
-Cycle 18:            j main                                                  Jump to main                                      
-Cycle 19:            addi $t1, $t1, -1                                       $t1 = 0                                           
-Cycle 20:            lw $t2, 5000 ($zero)                                    DRAM: Request Issued                              
-Cycle 21:            beq $t1, $zero, label                                   Values Matched : Jump to label                    
-Cycle 22:            add $t0, $t2, $t1                                       $t0 = 0                                           
-Cycle 15-24:         DRAM: Writeback row 2                                                                                     
-Cycle 25-34:         DRAM: Activate row 4      (Ins: lw $t2, 5000 ($zero))                                                     
-Cycle 35-36:         DRAM: Column Access (904) (Ins: lw $t2, 5000 ($zero))   $t2 = 0                                           
-Cycle 37-38:         DRAM: Column Access (904) (Ins: lw $t2, 5000 ($zero))   $t2 = 0                                           
-Cycle 39-40:         DRAM: Column Access (904) (Ins: lw $t2, 5000 ($zero))   $t2 = 0                                           
-Cycle 41-42:         DRAM: Column Access (904) (Ins: lw $t2, 5000 ($zero))   $t2 = 0                                           
-Cycle 43-44:         DRAM: Column Access (904) (Ins: lw $t2, 5000 ($zero))   $t2 = 0                                           
-Cycle 45-54:         DRAM: Writeback row 4                                                                                     
-======================================
-Program Execeuted Successfully
-======================================
+Cycle Count          File       Instruction                                             Register/Memory/Request                           
+Cycle1:              test1      addi $s0, $zero, 1000                                   $s0 = 1000                                        
+                     test2      addi $s3, $zero, 1000                                   $s3 = 1000                                        
+                     test3      addi $s0, $zero, 1000                                   $s0 = 1000                                        
+                     test4      addi $t0, $t0, 1000                                     $t0 = 1000                                        
+
+Cycle2:              test1      addi $s1, $zero, 3000                                   $s1 = 3000                                        
+                     test2      addi $s4, $zero, 3000                                   $s4 = 3000                                        
+                     test3      addi $s1, $zero, 2500                                   $s1 = 2500                                        
+                     test4      addi $t1, $t1, 2500                                     $t1 = 2500                                        
+
+Cycle3:              test1      addi $s2, $zero, 5000                                   $s2 = 5000                                        
+                     test2      addi $s5, $zero, 5000                                   $s5 = 5000                                        
+                     test3      addi $s5, $zero, 4000                                   $s5 = 4000                                        
+                     test4      addi $t2, $t2, 5000                                     $t2 = 5000                                        
+
+Cycle4:              test1      sw $s0, 1000($zero)                                     DRAM Request Issued                               
+                     test2      sw $s3, 1000($zero)                                     DRAM Request Issued                               
+                     test3      addi $t0, $zero, 1                                      $t0 = 1                                           
+                     test4      addi $t3, $t3, 7500                                     $t3 = 7500                                        
+
+Cycle5:              test1      sw $s1, 2000($zero)                                     DRAM Request Issued                               
+                     test2      lw $t2, 1000($zero)                                     DRAM Request Issued                               
+                     test3      addi $t1, $zero, 2                                      $t1 = 2                                           
+                     test4      addi $t4, $t4, 10000                                    $t4 = 10000                                       
+
+Cycle6:              test1      sw $s2, 3000($zero)                                     DRAM Request Issued                               
+                     test3      addi $t2, $zero, 3                                      $t2 = 3                                           
+                     test4      sw $t4, 0 ($t1)                                         DRAM Request Issued                               
+
+Cycle7:              test1      lw $t0, 1000($zero)                                     DRAM Request Issued                               
+                     test3      addi $t3, $zero, 4                                      $t3 = 4                                           
+                     test4      lw $s0, 0 ($t4)                                         DRAM Request Issued                               
+
+Cycle8:              test3      sw $t0, 0($s0)                                          DRAM Request Issued                               
+                     test4      sw $s0, 0 ($t1)                                         DRAM Request Issued                               
+
+Cycle9:              test3      sw $t1, 0($s1)                                          DRAM Request Issued                               
+                     test4      add $s0, $s1, $t4                                       $s0 = 10000                                       
+
+Cycle10:             test3      sw $t2, 4($s0)                                          DRAM Request Issued                               
+
+Cycle11:             test3      sw $t4, 4($s1)                                          DRAM Request Issued                               
+
+Cycle12:             test3      lw $t5, 0($s0)                                          DRAM Request Issued                               
+
+Cycle13:             test3      lw $t6, 0($s5)                                          DRAM Request Issued                               
+
+Cycle5-14:           test2      DRAM: Activate row 0      (Ins: sw $s3, 1000($zero))                                                      
+
+Cycle14:             test3      lw $t7, 4($s0)                                          DRAM Request Issued                               
+
+Cycle15:             test3      lw $t8, 4($s1)                                          DRAM Request Issued                               
+
+Cycle15-16:          test2      DRAM: Column Access 1000  (Ins: sw $s3, 1000($zero))    Address 1000-1003 = 1000                          
+
+Cycle17-18:          test1      DRAM: Column Access 1000  (Ins: sw $s0, 1000($zero))    Address 1000-1003 = 1000                          
+
+Cycle19-20:          test1      DRAM: Column Access 1000  (Ins: lw $t0, 1000($zero))    $t0 = 1000                                        
+
+Cycle21-22:          test2      DRAM: Column Access 1000  (Ins: lw $t2, 1000($zero))    $t2 = 1000                                        
+
+Cycle23-24:          test3      DRAM: Column Access 1000  (Ins: sw $t0, 0($s0))         Address 1000-1003 = 1                             
+
+Cycle25-26:          test3      DRAM: Column Access 1004  (Ins: sw $t2, 4($s0))         Address 1004-1007 = 3                             
+
+Cycle27-28:          test3      DRAM: Column Access 1000  (Ins: lw $t5, 0($s0))         $t5 = 1                                           
+
+Cycle29-30:          test3      DRAM: Column Access 1004  (Ins: lw $t7, 4($s0))         $t7 = 3                                           
+
+Cycle31-40:                     DRAM: Writeback row 0     (Ins: sw $t4, 0 ($t1))                                                          
+
+Cycle41-50:          test4      DRAM: Activate row 2      (Ins: sw $t4, 0 ($t1))                                                          
+
+Cycle51-52:          test4      DRAM: Column Access 452  (Ins: sw $t4, 0 ($t1))         Address 2500-2503 = 10000                         
+
+Cycle53-54:          test1      DRAM: Column Access 952  (Ins: sw $s2, 3000($zero))     Address 3000-3003 = 5000                          
+
+Cycle55-56:          test3      DRAM: Column Access 452  (Ins: sw $t1, 0($s1))          Address 2500-2503 = 2                             
+
+Cycle57-58:          test3      DRAM: Column Access 456  (Ins: sw $t4, 4($s1))          Address 2504-2507 = 0                             
+
+Cycle59-60:          test3      DRAM: Column Access 456  (Ins: lw $t8, 4($s1))          $t8 = 0                                           
+
+Cycle61-70:                     DRAM: Writeback row 2     (Ins: sw $s1, 2000($zero))                                                      
+
+Cycle71-80:          test1      DRAM: Activate row 1      (Ins: sw $s1, 2000($zero))                                                      
+
+Cycle81-82:          test1      DRAM: Column Access 976  (Ins: sw $s1, 2000($zero))     Address 2000-2003 = 3000                          
+
+Cycle83-92:                     DRAM: Writeback row 1     (Ins: lw $s0, 0 ($t4))                                                          
+
+Cycle93-102:         test4      DRAM: Activate row 9      (Ins: lw $s0, 0 ($t4))                                                          
+
+Cycle103-104:        test4      DRAM: Column Access 784  (Ins: lw $s0, 0 ($t4))         $s0 = 0                                           
+
+Cycle105-114:                   DRAM: Writeback row 9     (Ins: sw $s0, 0 ($t1))                                                          
+
+Cycle115-124:        test4      DRAM: Activate row 2      (Ins: sw $s0, 0 ($t1))                                                          
+
+Cycle125-126:        test4      DRAM: Column Access 452  (Ins: sw $s0, 0 ($t1))         Address 2500-2503 = 0                             
+
+Cycle127-136:                   DRAM: Writeback row 2     (Ins: lw $t6, 0($s5))                                                           
+
+Cycle137-146:        test3      DRAM: Activate row 3      (Ins: lw $t6, 0($s5))                                                           
+
+Cycle147-148:        test3      DRAM: Column Access 928  (Ins: lw $t6, 0($s5))          $t6 = 0                                           
+
+============================================================================
+-----------------------Program Execeuted Successfully-----------------------
+============================================================================
 Program Statistics
-Row Buffer Updates : 3
-
-Memory Content
-2500-2503: 5
-
-Operation Count    :     22
-add                :      1
-addi               :      6
-beq                :      5
-bne                :      0
-j                  :      4
-lw                 :      5
-mul                :      0
-slt                :      0
-sub                :      0
-sw                 :      1
-
-Instruction Count : 22
-Instruction Execution Count:
-1.    addi $t1, $t1, 5               =>  1  
-2.    sw $t1, 2500 ($zero)           =>  1  
-3.    addi $t1, $t1, -1              =>  5  
-4.    lw $t2, 5000 ($zero)           =>  5  
-5.    beq $t1, $zero, label          =>  5  
-6.    j main                         =>  4  
-7.    add $t0, $t2, $t1              =>  1  
-
-
-
-
-
-ASSIGNMENT 5
-
-ROW_ACCESS_DELAY: 10
-COLUMN_ACCESS_DELAY: 2
-Clock Cycles with Last Row Writeback(if any): 54
-
-Cycle Wise Analysis
-
-Cycle Count          Instruction                                             Register/Memory/Request                           
-Cycle 1:             addi $t1, $t1, 5                                        $t1 = 5                                           
-Cycle 2:             sw $t1, 2500 ($zero)                                    DRAM: Request Issued                              
-Cycle 3:             addi $t1, $t1, -1                                       $t1 = 4                                           
-Cycle 4:             lw $t2, 5000 ($zero)                                    DRAM: Request Issued                              
-Cycle 5:             beq $t1, $zero, label                                   Values Mismatched : Move to next instruction      
-Cycle 6:             j main                                                  Jump to main                                      
-Cycle 7:             addi $t1, $t1, -1                                       $t1 = 3                                           
-Cycle 8:             lw $t2, 5000 ($zero)                                    DRAM: Request Issued                              
-Cycle 9:             beq $t1, $zero, label                                   Values Mismatched : Move to next instruction      
-Cycle 10:            j main                                                  Jump to main                                      
-Cycle 11:            addi $t1, $t1, -1                                       $t1 = 2                                           
-Cycle 3-12:          DRAM: Activate row 2      (Ins: sw $t1, 2500 ($zero))                                                     
-Cycle 12:            lw $t2, 5000 ($zero)                                    DRAM: Request Issued                              
-Cycle 13:            beq $t1, $zero, label                                   Values Mismatched : Move to next instruction      
-Cycle 13-14:         DRAM: Column Access (452) (Ins: sw $t1, 2500 ($zero))   Address 2500-2503 = 5                             
-Cycle 14:            j main                                                  Jump to main                                      
-Cycle 15:            addi $t1, $t1, -1                                       $t1 = 1                                           
-Cycle 16:            lw $t2, 5000 ($zero)                                    DRAM: Request Issued                              
-Cycle 17:            beq $t1, $zero, label                                   Values Mismatched : Move to next instruction      
-Cycle 18:            j main                                                  Jump to main                                      
-Cycle 19:            addi $t1, $t1, -1                                       $t1 = 0                                           
-Cycle 20:            lw $t2, 5000 ($zero)                                    DRAM: Request Issued                              
-Cycle 21:            beq $t1, $zero, label                                   Values Matched : Jump to label                    
-Cycle 22:            add $t0, $t2, $t1                                       $t0 = 0                                           
-Cycle 15-24:         DRAM: Writeback row 2                                                                                     
-Cycle 25-34:         DRAM: Activate row 4      (Ins: lw $t2, 5000 ($zero))                                                     
-Cycle 35-36:         DRAM: Column Access (904) (Ins: lw $t2, 5000 ($zero))   $t2 = 0                                           
-Cycle 37-38:         DRAM: Column Access (904) (Ins: lw $t2, 5000 ($zero))   $t2 = 0                                           
-Cycle 39-40:         DRAM: Column Access (904) (Ins: lw $t2, 5000 ($zero))   $t2 = 0                                           
-Cycle 41-42:         DRAM: Column Access (904) (Ins: lw $t2, 5000 ($zero))   $t2 = 0                                           
-Cycle 43-44:         DRAM: Column Access (904) (Ins: lw $t2, 5000 ($zero))   $t2 = 0                                           
-Cycle 45-54:         DRAM: Writeback row 4                                                                                     
-======================================
-Program Execeuted Successfully
-======================================
-Program Statistics
-Row Buffer Updates : 3
-
-Memory Content
-2500-2503: 5
-
-Operation Count    :     22
-add                :      1
-addi               :      6
-beq                :      5
-bne                :      0
-j                  :      4
-lw                 :      5
-mul                :      0
-slt                :      0
-sub                :      0
-sw                 :      1
-
-Instruction Count : 22
-Instruction Execution Count:
-1.    addi $t1, $t1, 5               =>  1  
-2.    sw $t1, 2500 ($zero)           =>  1  
-3.    addi $t1, $t1, -1              =>  5  
-4.    lw $t2, 5000 ($zero)           =>  5  
-5.    beq $t1, $zero, label          =>  5  
-6.    j main                         =>  4  
-7.    add $t0, $t2, $t1              =>  1  
-
+Row Buffer Updates : 0
