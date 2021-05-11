@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HELPER_HPP
+#define HELPER_HPP
 
 #include "main.hpp"
 
@@ -17,7 +18,7 @@ string Registers::strip(string s){
     return s_new;
 }
 
-void   Registers::print_reg(){
+void Registers::print_reg(){
     int cnt = 0;
     for (auto i = reg.begin(); i != reg.end(); i++){
         stringstream ss;
@@ -33,15 +34,15 @@ void   Registers::print_reg(){
     cout <<"\n";
 }
 
-void   Registers::print_ins(instruction ins){
+void Registers::print_ins(instruction ins){
     cout << "Op : ->" << ins.op << "<-\n";
     cout << "Tar : ->" << ins.target << "<-\n";
     cout << "Sou1 : ->" << ins.source1 << "<-\n";
     cout << "Sou2 : ->" << ins.source2 << "<-\n";
-    cout << "Jump : ->" << ins.jump << "<-\n";
-    cout << "InstructionRead : ->" << ins.InstructionRead << "<-\n";
-    cout << "Jump : ->" << ins.jump << "<-\n";
-    cout << "Jump : ->" << ins.jump << "<-\n";
+    cout << "Cost : ->" << ins.cost << "\n";
+    cout << "EndTime : ->" << ins.Endtime << "\n\n";
+    // cout << "Jump : ->" << ins.jump << "<-\n";
+    // cout << "InstructionRead : ->" << ins.InstructionRead << "<-\n";
     // cout << "Jump_index : ->" << label[ins.jump] << "<-\n";
     // cout << "Off : ->" << ins.offset << "<-\n";
     // cout << "Fun_lable : ->" << ins.fun_label << "<-\n";
@@ -50,13 +51,13 @@ void   Registers::print_ins(instruction ins){
     // cout << ins.source1 << " (Updation): " ;printp(RegisterUpdation[ins.source1]); cout << " (Use): ";printp(RegisterUse[ins.source1]);cout << "\n";
 }
 
-void   Registers::print_map(map<string,int> m){
+void Registers::print_map(map<string,int> m){
     for(auto i=m.begin(); i!=m.end();i++){
         cout << "->" << i->ff << "<-->" << i->second <<"<-\n"; 
     }
 }  
 
-void   Registers::std_registers(){
+void Registers::std_registers(){
 
     // Standard QTSPIM registers
     reg["$zero"]   =0; reg["$at"]=0; reg["$v0"]=0; reg["$v1"]=0; 
@@ -91,13 +92,13 @@ void   Registers::std_registers(){
 
 }
 
-bool   Registers::Comparator(PrintCommand a, PrintCommand b){
+bool Registers::Comparator(PrintCommand a, PrintCommand b){
     if(a.End!=b.End)    return a.End   < b.End;
     if(a.Start!=b.Start)return a.Start < b.Start;
     return a.File < b.File;
 }
 
-bool   Registers::is_number(const string& s)
+bool Registers::is_number(const string& s)
 {
     string::const_iterator it = s.begin();
     if(*it=='-')it++;
@@ -105,7 +106,7 @@ bool   Registers::is_number(const string& s)
     return !s.empty() && it == s.end();
 }
 
-bool   Registers::AllotMemory(){
+bool Registers::AllotMemory(){
     if(instr.size() <= TotalMemory){
         
         MemoryAvailable = 4*(TotalMemory - instr.size());
@@ -124,13 +125,13 @@ bool   Registers::AllotMemory(){
     return true;
 }
 
-void   Registers::print_command_debug(PrintCommand pc){
+void Registers::print_command_debug(PrintCommand pc){
     cout << "Start : ->" << pc.Start << "<-\n";
     cout << "End : ->" << pc.End << "<-\n";
     cout << "Command : ->" << pc.Command << "<-\n\n";
 }
 
-void   Registers::print_command(PrintCommand pc){
+void Registers::print_command(PrintCommand pc){
     string s = "Cycle ";
     if(pc.Start == pc.End){
         s += to_string(pc.Start);
@@ -161,7 +162,7 @@ void   Registers::print_command(PrintCommand pc){
     }
 }
 
-void   Registers::Printing(){
+void Registers::Printing(){
 
     cout << "ASSIGNMENT 5\n\n";
     cout << "ROW_ACCESS_DELAY: " << RowDelay << "\n";
@@ -213,12 +214,22 @@ void FinalPrint(vector<PrintCommand> output)
 {   
     sort(output.begin(),output.end(),Registers::Comparator);
 
+    if(RowBuffer != -1)
+    {
+        PrintCommand pc;
+        pc.Start = output[output.size()-1].End + 1;
+        pc.End = pc.Start + RowDelay - 1;
+        pc.Command = "DRAM: Writeback row " + to_string(RowBuffer);
+        output.pb(pc);
+    }
+
     cout << "ASSIGNMENT 5\n\n";
+    cout << "CORES: " << CPU << "\n";
     cout << "ROW_ACCESS_DELAY: " << RowDelay << "\n";
     cout << "COLUMN_ACCESS_DELAY: " << ColumnDelay << "\n";
     cout << "Clock Cycles with Last Row Writeback(if any): " << output[output.size()-1].End<< "\n\n";
     cout << "Cycle Wise Analysis\n\n";
-    cout << boost::format("%-20s %-10s %-55s %-50s\n") % "Cycle Count" % "File" %"Instruction" % "Register/Memory/Request";
+    cout << boost::format("%-15s %-8s %-55s %-50s\n") % "Cycle Count" % "File" %"Instruction" % "Register/Memory/Request";
 
     for(int i=0;i<output.size();i++)
     {
@@ -226,7 +237,7 @@ void FinalPrint(vector<PrintCommand> output)
         string s = "";
         bool flagCheck = true;
         if(i>0 && output[i-1].Start == output[i].Start && output[i-1].End == output[i].End){s = "";flagCheck = false;}
-        else s = "Cycle";
+        else s = "Cycle ";
         
         PrintCommand pc = output[i];
         if(pc.Start == pc.End && flagCheck){
@@ -243,7 +254,7 @@ void FinalPrint(vector<PrintCommand> output)
         }
         string file = pc.File;
         
-        cout << boost::format("%-20s %-10s %-55s %-50s\n") % s % file % pc.Command % pc.Execution;
+        cout << boost::format("%-15s %-8s %-55s %-50s\n") % s % file % pc.Command % pc.Execution;
     }
     cout << "\n============================================================================\n";
     cout << "-----------------------Program Execeuted Successfully-----------------------\n";
@@ -1044,6 +1055,13 @@ void Registers::tokenize(string s){
 
 int input(int argc, char * argv[])
 {
+
+    if(argc == 1)
+    {
+        return 0;
+    }
+    
+
     if(argc >= 2 && argc <= 4)
     {
         if(!Registers::is_number(argv[1])){
@@ -1077,11 +1095,16 @@ int input(int argc, char * argv[])
 
 void VectorOutput(vector<instruction> v, string Name, int j)
 {
-    if(j!=-1)cout << Name << "Start " << j << endl;
-    else cout << Name << "Start " << endl;
+    if(j!=-1)cout << Name << "Start " << j;
+    else cout << Name << "Start ";
+    cout << ", " << v.size() << endl;
+    cout << RowBuffer << "\n";
     for(int p = 0; p < v.size(); p++)
         {
-            cout << v[p].original << "\n";
+            if(j == -1)cout << v[p].original << ", Cost: " << v[p].cost << ", Row: " << v[p].row << ", EndTime: " << v[p].Endtime << "\n";
+            else cout << v[p].original << ", Cost: " << v[p].cost << ", Row: " << v[p].row << ", EndTime: " << v[p].Endtime << "\n";
         }
     cout << Name << "End\n\n";
 }
+
+#endif

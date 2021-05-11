@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MAIN_HPP
+#define MAIN_HPP
 
 #include<climits>
 #include<iostream>
@@ -13,15 +14,23 @@
 #include<boost/algorithm/string.hpp>
 #include<boost/format.hpp> 
 
+#include "Constants.hpp"
+
 #define ff              first
 #define pb              push_back
 #define ss              second
 #define mp              make_pair
 #define pii             pair<int,int>
 #define printp(x)       cout << "(" <<  x.ff << "," << x.ss << ") "
-#define QUEUE_CAPACITY  32
-#define SIMULATION_TIME 100
-#define CLOCK_CHECK     200 // To avoid writing at same clock cycle
+
+#define d0(x) cout<<(x)<<" "
+#define d1(x) cout<<(x)<<endl
+#define d2(x,y) cout<<(x)<<" "<<(y)<<endl
+#define d3(x,y,z) cout<<(x)<<" "<<(y)<<" "<<(z)<<endl
+#define d4(a,b,c,d) cout<<(a)<<" "<<(b)<<" "<<(c)<<" "<<(d)<<endl
+#define d5(a,b,c,d,e) cout<<(a)<<" "<<(b)<<" "<<(c)<<" "<<(d)<<" "<<(e)<<endl
+#define d6(a,b,c,d,e,f) cout<<(a)<<" "<<(b)<<" "<<(c)<<" "<<(d)<<" "<<(e)<<" "<<(f)<<endl
+
 
 using namespace std;
 
@@ -41,11 +50,7 @@ int MemoryAvailable;
 int RowBuffer          = -1;
 int RowBufferUpdates   = 0;
 
-// Assignment-5
-int CPU = 2;
-string BaseFilename = "test";
-string InputDir = "InputFile/";
-// Assignment-5
+
 
 bool Part2 = false;
 bool flag  = false;
@@ -75,6 +80,8 @@ struct instruction{
     int cost = 0;
     bool issued = false;
     int FileIndex = -1;
+    int Endtime = -1; //  For lw/sw instruction
+
     vector<pair<int,int> > dependent; // Can be of length at most 4.
     // Different index will contain different instructions 
     // Kind of instructions will also vary with lw, sw
@@ -121,16 +128,16 @@ class Registers{
         bool ParsingExecution(string File);
         void ResolveDependency(instruction &ins);
 
-        void CheckDependency_add(instruction &ins, int index); 
+        void CheckDependency_add(instruction &ins, int index, bool Update); 
         // <-  True implies it is dependent
         // <-  False implies it is independent
 
-        void CheckDependency_beq(instruction &ins, int index);
-        void CheckDependency_j(instruction &ins, int index);
-        void CheckDependency_lw(instruction &ins, int index);
-        void CheckDependency_addi(instruction &ins, int index);
+        void CheckDependency_beq(instruction &ins, int index, bool Update);
+        void CheckDependency_j(instruction &ins, int index, bool Update);
+        void CheckDependency_lw(instruction &ins, int index, bool Update);
+        void CheckDependency_addi(instruction &ins, int index, bool Update);
 
-        bool CheckOverallDependency(instruction &ins, int index);
+        bool CheckOverallDependency(instruction &ins, int index, bool Update);
 
         void Execute_1(int j, instruction ins);
 
@@ -154,3 +161,4 @@ class Registers{
         
 };
 
+#endif
