@@ -36,6 +36,8 @@ using namespace std;
 
 map<int,pair<int,int> > MemoryUpdation, MemoryUse;
 vector<vector<int> > Dram;
+int UniversalIssueTime[UNIVERSAL_ISSUE_TIME];
+
 
 int RowDelay           = 10;
 int ColumnDelay        = 2;
@@ -45,7 +47,10 @@ int ColumnMemory       = 1024;
 int TotalMemory        = TotalMemory_4Bytes/4;
 int NumberOfCycles     = 0;
 int StartTime          = -1;
+
 int UniversalEndTime   = -1;
+int UniversalInstructionRead = 0;
+
 int MemoryAvailable;
 int RowBuffer          = -1;
 int RowBufferUpdates   = 0;
@@ -119,7 +124,7 @@ class Registers{
         void print_map(map<string,int> m);
         void print_command(PrintCommand pc);
         
-        void tokenize(string s);
+        void tokenize(string s, int jFileIndex);
         bool AllotMemory();
         
         void parse();

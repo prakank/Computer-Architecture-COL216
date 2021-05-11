@@ -268,7 +268,8 @@ void FinalPrint(vector<PrintCommand> output)
 
 bool Registers::EqualityInstruction(instruction a, instruction b)
 {
-    if(a.cost == b.cost && a.fun_label == b.fun_label &&
+    if(/* a.cost == b.cost && */ 
+        a.fun_label == b.fun_label &&
         a.InstructionCount == b.InstructionCount && a.InstructionRead == b.InstructionRead &&
         a.jump == b.jump && a.offset == b.offset && a.op == b.op && a.original == b.original 
         && a.source1 == b.source1 && a.source2 == b.source2 && a.target == b.target
@@ -877,7 +878,7 @@ void Registers::parse(){
     }
 }
 
-bool openFile(string path){
+bool openFile(string path, int i){
     path = InputDir + path;
     ifstream infile(path);
     if(infile.is_open()){
@@ -887,7 +888,7 @@ bool openFile(string path){
         int ln = 1;
         for(string line;getline(infile, line);){
             if(line == "")continue;
-            CPU_List[CPU_List.size()-1].tokenize(line);
+            CPU_List[CPU_List.size()-1].tokenize(line, i);
             if(flag){
                 cout << CPU_List[CPU_List.size()-1].print_msg;
                 cout << "FILE NAME: " << path << "\n";
@@ -968,7 +969,7 @@ string Registers::InstructionExecution(instruction &ins)
     return s;
 }
 
-void Registers::tokenize(string s){
+void Registers::tokenize(string s, int jFileIndex){
     instruction ins;
     if(s.empty())return; // It might be the case that we have an empty line <- If we use labels, then we can safely ignore empty lines
     int i = 0;
@@ -986,7 +987,7 @@ void Registers::tokenize(string s){
         instr.pb(ins);
         // cout << s << "   <- Label\n";
         // cout << "->" << s.substr(j+1,s.size()-j-1) << "<-Label\n";
-        tokenize(s.substr(j+1,s.size()-j-1));
+        tokenize(s.substr(j+1,s.size()-j-1), jFileIndex);
         return;
     }
 
@@ -1042,6 +1043,21 @@ void Registers::tokenize(string s){
         while(i<tokens[1].size() && (tokens[1][i]==' ' || tokens[1][i]=='\t'))i++;
         if(i == tokens[1].size() || tokens[1][i]!='('){flag=true;print_msg = "ERROR : Syntax Error\n";return;}
         ins.offset = s;
+
+        
+        if(SEPARATE_ROWS)
+        {
+            if(jFileIndex != CPU)
+            {
+                ins.offset = to_string( stoi(s) + (RowMemory/CPU)*(jFileIndex-1)*ColumnMemory );
+            }
+            else
+            {
+                ins.offset = to_string(stoi(s) + (RowMemory - (RowMemory/CPU)*(jFileIndex-1))*ColumnMemory );
+            }
+        }
+
+
         ins.source1 = tokens[1].substr(i+1,tokens[1].size() - i - 2);
     }
     else{

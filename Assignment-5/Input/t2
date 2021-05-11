@@ -1,0 +1,5 @@
+addi $s0, $s0, 20
+sw $s0, 1000($zero)
+lw $s1, 1028($zero)
+add $s1, $s1, $s0
+mul $s2, $s1, $s0

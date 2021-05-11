@@ -1,0 +1,133 @@
+ASSIGNMENT 5
+
+CORES: 4
+ROW_ACCESS_DELAY: 10
+COLUMN_ACCESS_DELAY: 2
+Clock Cycles with Last Row Writeback(if any): 88
+
+Cycle Wise Analysis
+
+Cycle Count     File     Instruction                                             Register/Memory/Request                           
+Cycle 1:        t1       addi $s0, $zero, 5                                      $s0 = 5                                           
+                t2       addi $s0, $s0, 20                                       $s0 = 20                                          
+                t3       addi $t0, $t0, 15                                       $t0 = 15                                          
+                t4       addi $s0, $zero, 1000                                   $s0 = 1000                                        
+
+Cycle 2:        t1       addi $s1, $zero, 0                                      $s1 = 0                                           
+                t3       sw $t0, 1000($zero)                                     DRAM Request Issued                               
+                t4       addi $s1, $zero, 2500                                   $s1 = 2500                                        
+
+Cycle 3:        t1       addi $s2, $zero, 1                                      $s2 = 1                                           
+                t2       lw $s1, 1028($zero)                                     DRAM Request Issued                               
+                t4       addi $t0, $zero, 1                                      $t0 = 1                                           
+
+Cycle 4:        t1       addi $s3, $zero, 1                                      $s3 = 1                                           
+                t2       sw $s0, 1000($zero)                                     DRAM Request Issued                               
+                t4       addi $t1, $zero, 2                                      $t1 = 2                                           
+
+Cycle 5:        t1       addi $s4, $zero, 1                                      $s4 = 1                                           
+                t3       lw $t1, 1000($zero)                                     DRAM Request Issued                               
+                t4       addi $t2, $zero, 3                                      $t2 = 3                                           
+
+Cycle 6:        t1       slt $t0, $s0, $s2                                       $t0 = 0                                           
+                t4       addi $t3, $zero, 4                                      $t3 = 4                                           
+
+Cycle 7:        t1       beq $t0, $zero, run                                     Values Matched : Jump to run                      
+                t4       sw $t0, 0($s0)                                          DRAM Request Issued                               
+
+Cycle 8:        t1       add $s1, $s1, $s0                                       $s1 = 10                                          
+                t4       sw $t1, 0($s1)                                          DRAM Request Issued                               
+
+Cycle 9:        t1       mul $s3, $s3, $s0                                       $s3 = 25                                          
+                t4       sw $t2, 4($s0)                                          DRAM Request Issued                               
+
+Cycle 10:       t1       sub $s0, $s0, $s4                                       $s0 = 3                                           
+                t4       sw $t3, 4($s1)                                          DRAM Request Issued                               
+
+Cycle 11:       t1       j check                                                 Jump to check                                     
+                t4       lw $t5, 0($s0)                                          DRAM Request Issued                               
+
+Cycle 3-12:     t3       DRAM: Activate row 0      ( Ins: sw $t0, 1000($zero) )                                                    
+
+Cycle 12:       t1       slt $t0, $s0, $s2                                       $t0 = 0                                           
+                t4       lw $t6, 0($s1)                                          DRAM Request Issued                               
+
+Cycle 13:       t1       beq $t0, $zero, run                                     Values Matched : Jump to run                      
+                t4       lw $t7, 4($s0)                                          DRAM Request Issued                               
+
+Cycle 13-14:    t3       DRAM: Column Access 1000  ( Ins: sw $t0, 1000($zero) )  Address 1000-1003 = 15                            
+
+Cycle 14:       t1       add $s1, $s1, $s0                                       $s1 = 16                                          
+                t4       lw $t8, 4($s1)                                          DRAM Request Issued                               
+
+Cycle 15:       t1       mul $s3, $s3, $s0                                       $s3 = 225                                         
+
+Cycle 15-16:    t4       DRAM: Column Access 1000  ( Ins: sw $t0, 0($s0) )       Address 1000-1003 = 1                             
+
+Cycle 16:       t1       sub $s0, $s0, $s4                                       $s0 = 1                                           
+
+Cycle 17:       t1       j check                                                 Jump to check                                     
+
+Cycle 17-18:    t2       DRAM: Column Access 1000  ( Ins: sw $s0, 1000($zero) )  Address 1000-1003 = 20                            
+
+Cycle 18:       t1       slt $t0, $s0, $s2                                       $t0 = 0                                           
+
+Cycle 19:       t1       beq $t0, $zero, run                                     Values Matched : Jump to run                      
+
+Cycle 19-20:    t3       DRAM: Column Access 1000  ( Ins: lw $t1, 1000($zero) )  $t1 = 20                                          
+
+Cycle 20:       t1       add $s1, $s1, $s0                                       $s1 = 18                                          
+
+Cycle 21:       t1       mul $s3, $s3, $s0                                       $s3 = 225                                         
+                t3       add $t1, $t1, $t1                                       $t1 = 80                                          
+
+Cycle 21-22:    t4       DRAM: Column Access 1004  ( Ins: sw $t2, 4($s0) )       Address 1004-1007 = 3                             
+
+Cycle 22:       t1       sub $s0, $s0, $s4                                       $s0 = -1                                          
+                t3       mul $t2, $t1, $t0                                       $t2 = 1200                                        
+
+Cycle 23:       t1       j check                                                 Jump to check                                     
+
+Cycle 23-24:    t4       DRAM: Column Access 1000  ( Ins: lw $t5, 0($s0) )       $t5 = 20                                          
+
+Cycle 24:       t1       slt $t0, $s0, $s2                                       $t0 = 1                                           
+
+Cycle 25:       t1       beq $t0, $zero, run                                     Values Mismatched : Move to next instruction      
+
+Cycle 25-26:    t4       DRAM: Column Access 1004  ( Ins: lw $t7, 4($s0) )       $t7 = 3                                           
+
+Cycle 26:       t1       bne $t0, $zero, loopexit                                Values Mismatched : Jump to loopexit              
+
+Cycle 27:       t1       add $s1, $s1, $zero                                     $s1 = 18                                          
+
+Cycle 28:       t1       mul $s3, $s3, $s4                                       $s3 = 225                                         
+
+Cycle 27-36:             DRAM: Writeback row 0     ( Ins: sw $t3, 4($s1) )                                                         
+
+Cycle 37-46:    t4       DRAM: Activate row 2      ( Ins: sw $t3, 4($s1) )                                                         
+
+Cycle 47-48:    t4       DRAM: Column Access 456   ( Ins: sw $t3, 4($s1) )       Address 2504-2507 = 4                             
+
+Cycle 49-50:    t4       DRAM: Column Access 452   ( Ins: sw $t1, 0($s1) )       Address 2500-2503 = 2                             
+
+Cycle 51-52:    t4       DRAM: Column Access 452   ( Ins: lw $t6, 0($s1) )       $t6 = 2                                           
+
+Cycle 53-54:    t4       DRAM: Column Access 456   ( Ins: lw $t8, 4($s1) )       $t8 = 4                                           
+
+Cycle 55-64:             DRAM: Writeback row 2     ( Ins: lw $s1, 1028($zero) )                                                    
+
+Cycle 65-74:    t2       DRAM: Activate row 1      ( Ins: lw $s1, 1028($zero) )                                                    
+
+Cycle 75-76:    t2       DRAM: Column Access 4     ( Ins: lw $s1, 1028($zero) )  $s1 = 0                                           
+
+Cycle 77:       t2       add $s1, $s1, $s0                                       $s1 = 40                                          
+
+Cycle 78:       t2       mul $s2, $s1, $s0                                       $s2 = 800                                         
+
+Cycle 79-88:             DRAM: Writeback row 1                                                                                     
+
+============================================================================
+-----------------------Program Execeuted Successfully-----------------------
+============================================================================
+Program Statistics
+Row Buffer Updates : 0

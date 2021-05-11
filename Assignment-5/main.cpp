@@ -175,6 +175,7 @@ instruction Registers::parse_new()
 
     else i++;
 
+    ins.InstructionRead = UniversalInstructionRead;
     QueueInstruction_new.pb(ins);
 
     return ins;
@@ -228,7 +229,7 @@ void Registers::DramRequestIssued(instruction &ins)
 {
     PrintCommand pc;
     
-    int ind = max(EndTime,1);
+    int ind = max(EndTime,max(1,UniversalInstructionRead));
     while(ClockCount[ind] == 1)ind++;
     ClockCount[ind] = 1;
     EndTime = ind+1;
@@ -238,14 +239,29 @@ void Registers::DramRequestIssued(instruction &ins)
     pc.Execution = "DRAM Request Issued";
     pc.File = BaseFilename + to_string(ins.FileIndex);
     
-    ins.InstructionRead = ind;
+    // ins.InstructionRead = ind;
     ins.issued = true;
+    ins.Endtime = pc.End;
 
     int j    = ins.FileIndex;    
     int x = stoi(ins.offset) +  CPU_List[j-1].reg[ins.source1];
     ins.row = int(x / ColumnMemory);
 
     output.pb(pc);
+
+    //---------------------------------
+    vector<instruction>::iterator it;
+    for(it = QueueInstruction_new.begin(); it!=QueueInstruction_new.end(); it++)
+    {
+        if(EqualityInstruction(*it, ins)){                        
+            it->issued = true;
+            it->Endtime = ins.Endtime;
+            it->row = ins.row;
+            break;
+        }                
+    }
+    //---------------------------------
+
 }
 
 void Registers::DeleteInstruction(instruction &ins)
@@ -299,19 +315,19 @@ void Execute_lw_sw(instruction &ins)
     pc.Start = max( ins.InstructionRead + 1, UniversalEndTime + 1);
     int j    = ins.FileIndex;    
 
-    int x;
+    // int x;
     
-    try
-    {
-        x = stoi(ins.offset) +  CPU_List[j-1].reg[ins.source1];
-        if(x<0)throw 1;
-    }
-    catch (int x)
-    {
-        cout << "Exception\n";
-    }
+    // try
+    // {
+    //     x = stoi(ins.offset) +  CPU_List[j-1].reg[ins.source1];
+    //     if(x<0)throw 1;
+    // }
+    // catch (int x)
+    // {
+    //     cout << "Exception\n";
+    // }
 
-    // int x = stoi(ins.offset) +  CPU_List[j-1].reg[ins.source1];
+    int x = stoi(ins.offset) +  CPU_List[j-1].reg[ins.source1];
     
     int rownumber    = ins.row;    
     int columnnumber = (x)%ColumnMemory;
@@ -379,15 +395,103 @@ void Execute_lw_sw(instruction &ins)
 
 void MemoryManager_Implementation()
 {
-    if(MemoryManager.size() != 0)
+
+    vector<instruction> MemoryManager_NotIssued;
+
+    for(int i=0;i<MemoryManager.size();i++)
+    {
+        if(!MemoryManager[i].issued)
+        {
+            MemoryManager_NotIssued.pb(MemoryManager[i]);
+        }
+    }
+
+    int MinCost = INT_MAX;
+    vector<instruction>Notissued;
+
+    for(int i=0;i<MemoryManager_NotIssued.size();i++)
+    {
+        MinCost = min(MinCost, MemoryManager_NotIssued[i].cost);
+    }
+
+    for(int i=0;i<MemoryManager_NotIssued.size();i++)
+    {
+        if(MemoryManager_NotIssued[i].cost == MinCost)
+        {
+            Notissued.pb(MemoryManager_NotIssued[i]);
+        }
+    }
+
+    MemoryManager_NotIssued = Notissued;
+
+    if( MemoryManager_NotIssued.size() > 0)
     {
         if(UniversalEndTime == -1)
         {
-            instruction ins = MemoryManager[rand() % MemoryManager.size()];
+            instruction ins = MemoryManager_NotIssued[rand() % MemoryManager_NotIssued.size()];
+            CPU_List[ins.FileIndex-1].DramRequestIssued(ins);
+
+        }
+        else
+        {
+            bool issued = false;
+            for(int i=0; i < MemoryManager_NotIssued.size(); i++)
+            {
+                instruction ins = MemoryManager_NotIssued[i];
+                int x = stoi(ins.offset) +  CPU_List[ins.FileIndex-1].reg[ins.source1];
+
+                MemoryManager_NotIssued[i].row = int(x / ColumnMemory);                
+                if(RowBuffer == MemoryManager_NotIssued[i].row)
+                {
+                    CPU_List[ins.FileIndex-1].DramRequestIssued(MemoryManager_NotIssued[i]);
+                    issued = true;
+                    break;
+                }
+            }
+            if(!issued)
+            {
+                instruction ins = MemoryManager_NotIssued[rand() % MemoryManager_NotIssued.size()];
+                CPU_List[ins.FileIndex-1].DramRequestIssued(ins);
+            }
+        }
+    }
+
+    vector<instruction> MemoryManager_Issued;
+
+
+    MinCost = INT_MAX;
+    vector<instruction>Issued_Instr;
+
+    for(int i = 0; i < MemoryManager.size(); i++)
+    {
+        if(MemoryManager[i].issued) MemoryManager_Issued.pb(MemoryManager[i]);
+    }
+
+    for(int i=0;i<MemoryManager_Issued.size();i++)
+    {
+        MinCost = min(MinCost, MemoryManager_Issued[i].cost);
+    }
+
+    for(int i=0;i<MemoryManager_Issued.size();i++)
+    {
+        if(MemoryManager_Issued[i].cost == MinCost)
+        {
+            Issued_Instr.pb(MemoryManager_Issued[i]);
+        }
+    }
+
+    MemoryManager_Issued = Issued_Instr;
+
+    if(MemoryManager_Issued.size() > 0)
+    {
+        if(UniversalEndTime == -1)
+        {
+            instruction ins = MemoryManager_Issued[rand() % MemoryManager_Issued.size()];
             Execute_lw_sw(ins);
             return;
         }
-        else{
+        else
+        {
             bool wait = false;
             
             for(int j=0; j < CPU; j++)
@@ -395,35 +499,46 @@ void MemoryManager_Implementation()
                 if(CPU_List[j].EndTime < UniversalEndTime && CPU_List[j].i >= CPU_List[j].instr.size() ) CPU_List[j].EndTime = UniversalEndTime;  
                 else if(CPU_List[j].i < CPU_List[j].instr.size() && CPU_List[j].EndTime  < UniversalEndTime ){
                     wait = true;
-                    // d4(j, CPU_List[j].EndTime, "Universal", UniversalEndTime);
                 }
-                // d4(j, CPU_List[j].EndTime, "Universal", UniversalEndTime);
             }
-            // if(!wait)cout << "Hey\n";
+
             if(!wait)
             {
                 // Ready to execute an instruction in Memory Manager.
                 bool SameRow = false;
-                for(int j=0; j < MemoryManager.size(); j++)
+                for(int j=0; j < MemoryManager_Issued.size(); j++)
                 {
-                    if(MemoryManager[j].row == RowBuffer)
+                    if(MemoryManager_Issued[j].row == RowBuffer)
                     {
-                        Execute_lw_sw(MemoryManager[j]);
-
-                        // cout << "SAME ROW\n";
-
+                        Execute_lw_sw(MemoryManager_Issued[j]);
                         SameRow = true;
                         break;
                     }
                 }
                 if(!SameRow)
                 {
-                    instruction ins = MemoryManager[rand() % MemoryManager.size()];
+                    instruction ins = MemoryManager_Issued[rand() % MemoryManager_Issued.size()];
                     Execute_lw_sw(ins);
                 }
             }
+
         }
     }
+
+    /*
+
+    We have MemoryManager Vector
+    This will contain all lw/sw instructions ( Not just minimum)
+
+    Make a vector containing non-issued instructions and select one out of them and issue Dram request
+    ( Implement Random selection ... Optimize it later )
+
+    Iterate over MemoryManager and store issued instructions in some other vector
+    Select one out of them using some algorithm and execute it (if possible)
+
+
+
+    */
 }
 
 int main(int argc, char * argv[]){
@@ -431,15 +546,13 @@ int main(int argc, char * argv[]){
     int program = input(argc, argv);
     if(program == -1)return -1;
 
-    // cout << "Hey\n";
-    // d2("CPU ",CPU);
-    // return 0;
+    for(int i=0;i<UNIVERSAL_ISSUE_TIME;i++)UniversalIssueTime[i]=0;
 
     // This loop ensures that all files are tokenized and parsed correctly
     for(int i=0; i<CPU; i++){
 
         string filename = BaseFilename + to_string(i+1);
-        bool result = openFile(filename);
+        bool result = openFile(filename, i+1);
         if(!result)return -1;
         CPU_List[i].parse();
 
@@ -458,9 +571,15 @@ int main(int argc, char * argv[]){
 
     while(true)
     {
+        UniversalInstructionRead++;
         bool check = false;        
         MemoryManager.clear();
         
+        // d1(UniversalInstructionRead);
+        // d2(CPU_List[0].EndTime, CPU_List[1].EndTime);
+
+        vector<instruction> DramRequestIssued_Vector;
+
         for(int j = 0; j < CPU; j++)
         {                    
             // cout << "Hey0\n";
@@ -470,26 +589,36 @@ int main(int argc, char * argv[]){
                 // CPU_List[j].EndTime++;
                 continue; // Means file has been read completely
             }
-            check = true;
+            check = true;            
 
             for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); k++)
             {
-                if(CPU_List[j].QueueInstruction_new[k].cost == 1){
+                if(k >= CPU_List[j].QueueInstruction_new.size())break;
+
+                CPU_List[j].QueueInstruction_new[k].FileIndex = j+1;
+                if(CPU_List[j].QueueInstruction_new[k].cost == 1)
+                {
                     CPU_List[j].Execute_1(j+1, CPU_List[j].QueueInstruction_new[k]);
                     k--;
                     k = max(0,k);
                 }                
-                else if( (CPU_List[j].QueueInstruction_new[k].op == "lw" || CPU_List[j].QueueInstruction_new[k].op == "sw") && 
-                    !CPU_List[j].QueueInstruction_new[k].issued)
-                {
-                    // cout << CPU_List[j].QueueInstruction_new[k].original << " " << CPU_List[j].QueueInstruction_new[k].InstructionRead << endl;
-                    CPU_List[j].QueueInstruction_new[k].FileIndex = j+1;
-                    CPU_List[j].DramRequestIssued(CPU_List[j].QueueInstruction_new[k]);
-                    // cout << CPU_List[j].QueueInstruction_new[k].original << " " << CPU_List[j].QueueInstruction_new[k].InstructionRead << endl;
-                }
-            }
-
-
+                // else if( (CPU_List[j].QueueInstruction_new[k].op == "lw" || CPU_List[j].QueueInstruction_new[k].op == "sw") && 
+                //     !CPU_List[j].QueueInstruction_new[k].issued)
+                // {
+                //     if(CPU_List[j].ClockCount[UniversalInstructionRead] == 0)
+                //     {
+                //         DramRequestIssued_Vector.pb(CPU_List[j].QueueInstruction_new[k]);
+                //     }
+                //     else
+                //     {
+                //         CPU_List[j].i--;
+                //         CPU_List[j].print_count--;
+                //         CPU_List[j].QueueInstruction_new.erase(CPU_List[j].QueueInstruction_new.end()-1);
+                //         CPU_List[j].EndTime++;
+                //     }
+                //     // CPU_List[j].DramRequestIssued(CPU_List[j].QueueInstruction_new[k]);                    
+                // }
+            }            
 
             int k_temp = 0;
             while( k_temp < CPU_List[j].QueueInstruction_new.size() )
@@ -503,36 +632,42 @@ int main(int argc, char * argv[]){
                 }
             }
 
-
+            for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); k++)
+            {
+                if(CPU_List[j].QueueInstruction_new[k].op == "sw" || CPU_List[j].QueueInstruction_new[k].op == "lw")
+                {
+                    MemoryManager.pb(CPU_List[j].QueueInstruction_new[k]);
+                }
+            }
 
             int cst = INT_MAX;
             instruction temp;            
 
-            for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); k++)
-            {
-                if(CPU_List[j].QueueInstruction_new[k].cost < cst)
-                {
-                    temp = CPU_List[j].QueueInstruction_new[k];
-                    cst = CPU_List[j].QueueInstruction_new[k].cost;
-                }
-                CPU_List[j].QueueInstruction_new[k].FileIndex = j+1;
-            }
+            // for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); k++)
+            // {
+            //     if(CPU_List[j].QueueInstruction_new[k].cost < cst)
+            //     {
+            //         temp = CPU_List[j].QueueInstruction_new[k];
+            //         cst = CPU_List[j].QueueInstruction_new[k].cost;
+            //     }
+            //     CPU_List[j].QueueInstruction_new[k].FileIndex = j+1;
+            // }
 
-            for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); k++)
-            {
-                try{
-                    if(CPU_List[j].QueueInstruction_new[k].cost == cst && (CPU_List[j].QueueInstruction_new[k].op[1] == 'w'))
-                    {
-                        MemoryManager.pb(CPU_List[j].QueueInstruction_new[k]);
-                    }
-                }
-                catch (...)
-                {
-                    cout << CPU_List[j].QueueInstruction_new[k].op << endl;
-                    return -1;
-                }
+            // for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); k++)
+            // {
+            //     try{
+            //         if(CPU_List[j].QueueInstruction_new[k].cost == cst && (CPU_List[j].QueueInstruction_new[k].op[1] == 'w'))
+            //         {
+            //             MemoryManager.pb(CPU_List[j].QueueInstruction_new[k]);
+            //         }
+            //     }
+            //     catch (...)
+            //     {
+            //         cout << CPU_List[j].QueueInstruction_new[k].op << endl;
+            //         return -1;
+            //     }
                 
-            }
+            // }
 
             // VectorOutput(CPU_List[j].QueueInstruction_new, "Queue", j+1);
             // cout << "Hey0\n";
@@ -541,15 +676,44 @@ int main(int argc, char * argv[]){
 
         }
 
+        // vector<instruction> DramRequestIssued_Vector_Available;
+
+        // d1(DramRequestIssued_Vector.size());
+        // d1(rand() % DramRequestIssued_Vector.size());
+
+        bool MemoryManagerActive = true;
+        
+        if(DramRequestIssued_Vector.size() > 0)
+        {
+            auto lw_sw_instr = DramRequestIssued_Vector[ rand() % DramRequestIssued_Vector.size() ];
+            int jFileIndex = lw_sw_instr.FileIndex-1;
+            CPU_List[jFileIndex].DramRequestIssued( lw_sw_instr );
+
+            for(int z = 0; z < DramRequestIssued_Vector.size(); z++)
+            {
+                if(!DramRequestIssued_Vector[z].issued)
+                {
+                    CPU_List[jFileIndex].i--;
+                    CPU_List[jFileIndex].print_count--;
+                    CPU_List[jFileIndex].QueueInstruction_new.erase(CPU_List[jFileIndex].QueueInstruction_new.end()-1);
+                    CPU_List[jFileIndex].EndTime++;
+                }
+            }
+
+            MemoryManagerActive = false;
+        }
         // cout << MemoryManager.size() << endl;
 
         // cout << "Hey1\n";
         // return 0;
 
-
         // VectorOutput(MemoryManager, "MemoryManager", -1);        
 
-        MemoryManager_Implementation();
+        if(MemoryManagerActive)
+        {
+            MemoryManager_Implementation();
+        }
+
         // cout << "Hey2\n";
 
         // stop--;
@@ -561,11 +725,8 @@ int main(int argc, char * argv[]){
     // VectorOutput(CPU_List[0].QueueInstruction_new, "Queue", 1);
     // VectorOutput(MemoryManager, "MemoryManager", -1);
 
-
     // d1("Hello");
     // return 0;
-
-    
 
     // cout << "H";
     while(true)
@@ -585,8 +746,6 @@ int main(int argc, char * argv[]){
 
             // VectorOutput(CPU_List[j].QueueInstruction_new, "Queue", j+1);
             
-
-
             int k_temp = 0;
 
             while( k_temp < CPU_List[j].QueueInstruction_new.size() )
@@ -598,8 +757,6 @@ int main(int argc, char * argv[]){
                     k_temp++;
                 }
             }
-
-
 
             // for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); ++k)
             // {
@@ -657,7 +814,6 @@ int main(int argc, char * argv[]){
 
     // d1("Hello");
     // return 0;
-
 
     FinalPrint(output);
 
