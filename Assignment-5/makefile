@@ -6,7 +6,7 @@ H2	   = Constants
 
 ROW_ACCESS_DELAY = 10
 COLUMN_ACCESS_DELAY = 2
-CPU = 4
+CPU = 5
 INPUT = input
 SRC_DIR = Input
 OUT_DIR = Output

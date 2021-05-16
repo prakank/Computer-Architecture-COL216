@@ -76,7 +76,11 @@ void Registers::std_registers(){
     // reg["$r20"]=0;reg["$r21"]=0;reg["$r22"]=0;reg["$r23"]=0;reg["$r24"]=0;reg["$r25"]=0;reg["$r26"]=0;reg["$r27"]=0;reg["$r28"]=0;reg["$r29"]=0;
     // reg["$r30"]=0;reg["$zero"]=0;
 
-    for(auto i = reg.begin(); i != reg.end(); i++){RegisterUpdation[i->ff] = mp(-1,-1); RegisterUse[i->ff] = mp(-1,-1);}
+    for(auto i = reg.begin(); i != reg.end(); i++)
+    {
+        regEndTime[i->ff] = 0;
+        RegisterUpdation[i->ff] = mp(-1,-1); RegisterUse[i->ff] = mp(-1,-1);
+    }
 
     // Initializing the InstructionCountVector
     InstructionCountVector["add"] = 0;
@@ -95,7 +99,12 @@ void Registers::std_registers(){
 bool Registers::Comparator(PrintCommand a, PrintCommand b){
     if(a.End!=b.End)    return a.End   < b.End;
     if(a.Start!=b.Start)return a.Start < b.Start;
-    return a.File < b.File;
+    vector<string> temp1, temp2;
+    boost::split(temp1, a.File, boost::is_any_of(BaseFilename));
+    boost::split(temp2, b.File, boost::is_any_of(BaseFilename));
+    // cout << "Size: " << temp1.size() << ", 1st: " << temp1[0] << ", 2nd: " << temp1[1] << endl;
+    // cout << temp2.size() << "  " << temp2[0] << endl;
+    return stoi(temp1[1]) < stoi(temp2[1]);
 }
 
 bool Registers::is_number(const string& s)
@@ -227,9 +236,11 @@ void FinalPrint(vector<PrintCommand> output)
     cout << "CORES: " << CPU << "\n";
     cout << "ROW_ACCESS_DELAY: " << RowDelay << "\n";
     cout << "COLUMN_ACCESS_DELAY: " << ColumnDelay << "\n";
-    cout << "Clock Cycles with Last Row Writeback(if any): " << output[output.size()-1].End<< "\n\n";
+    cout << "Clock Cycles with Last Row Writeback(if any): " << min(output[output.size()-1].End, SIMULATION_TIME) << "\n\n";
     cout << "Cycle Wise Analysis\n\n";
     cout << boost::format("%-15s %-8s %-55s %-50s\n") % "Cycle Count" % "File" %"Instruction" % "Register/Memory/Request";
+
+    int TotalInstructions = 0;
 
     for(int i=0;i<output.size();i++)
     {
@@ -238,7 +249,8 @@ void FinalPrint(vector<PrintCommand> output)
         bool flagCheck = true;
         if(i>0 && output[i-1].Start == output[i].Start && output[i-1].End == output[i].End){s = "";flagCheck = false;}
         else s = "Cycle ";
-        
+
+
         PrintCommand pc = output[i];
         if(pc.Start == pc.End && flagCheck){
             s += to_string(pc.Start);
@@ -253,6 +265,18 @@ void FinalPrint(vector<PrintCommand> output)
             s += ":";
         }
         string file = pc.File;
+
+
+        if(pc.End > SIMULATION_TIME)
+        {
+            break;
+        }
+
+        
+
+        TotalInstructions++;
+
+        if(pc.Execution.size() > 4 && pc.Execution.substr(0, 4) == "DRAM" || pc.Execution == "")TotalInstructions--;
         
         cout << boost::format("%-15s %-8s %-55s %-50s\n") % s % file % pc.Command % pc.Execution;
     }
@@ -261,6 +285,8 @@ void FinalPrint(vector<PrintCommand> output)
     cout << "============================================================================\n";
 
     cout << "Program Statistics\n";
+
+    cout << "Instruction Throughput : " << float(TotalInstructions)/float(min(output[output.size()-1].End, SIMULATION_TIME)) << "\n";
 
     cout << "Row Buffer Updates : " << RowBufferUpdates << endl;
     

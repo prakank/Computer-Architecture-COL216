@@ -166,17 +166,64 @@ instruction Registers::parse_new()
         i++;
         print_count--;
         return parse_new();
+        // This is for the case like
+        // main:
+        //      addi $s0, $t0, 1
+        // and we are currently on the "main:" line
     }
 
-    if(  ins.op == "j" || 
-        (ins.op == "beq" && reg[ins.source1] == reg[ins.source2]) ||
-        (ins.op == "bne" && reg[ins.source1] != reg[ins.source2])
-    ) i = label[ins.jump];
+    if(ins.op == "j")
+    {
+        i = label[ins.jump];
+    }
 
+    // Need to stall this Core as we need to know the updated values of registers involved.
+    // Basically, there will be 2 cases, independent or dependent
+    // If this instruction is independent, then we can safely execute it and decide our branch
+    // If not, then we will have to stall this core.
+    else if(ins.op == "beq" || ins.op == "bne")
+    {
+        if(ins.cost == 1)
+        {
+            if(regEndTime[ins.source1] >= EndTime || regEndTime[ins.source2] >= EndTime){
+                EndTime++;
+                return ins;                
+            } // For beq/bne instruction :)            
+
+            if( ( ins.op == "beq" && reg[ins.source1] == reg[ins.source2] ) ||
+                ( ins.op == "bne" && reg[ins.source1] != reg[ins.source2] ) 
+            ) i = label[ins.jump];
+
+            else i++;            
+        }
+        else
+        {
+            // ins.cost = -2; // To tell the core that I need to resolve the dependency before deciding the branch            
+            // No need to push this instruction to the queue
+            // I have not changed the value of i <= so no possibilty for moving to the next instruction            
+            EndTime++;
+            return ins;
+        }
+        
+    }
     else i++;
 
+    // if(  ins.op == "j" || 
+    //     (ins.op == "beq" && reg[ins.source1] == reg[ins.source2]) ||
+    //     (ins.op == "bne" && reg[ins.source1] != reg[ins.source2])
+    // ) i = label[ins.jump];
+
+    // else i++;
+
     ins.InstructionRead = UniversalInstructionRead;
-    QueueInstruction_new.pb(ins);
+
+    // d1(ins.InstructionRead);
+    if(ins.InstructionRead + RowDelay + ColumnDelay <= SIMULATION_TIME)QueueInstruction_new.pb(ins);
+    else
+    {
+        EndTime++;
+    }
+    // else d1("HOAL HOLA");
 
     return ins;
 
@@ -275,15 +322,10 @@ void Registers::DeleteInstruction(instruction &ins)
     for(it = QueueInstruction_new.begin(); it!=QueueInstruction_new.end(); it++)
     {
         if(EqualityInstruction(*it, ins)){
-
             it_temp->Endtime = ins.Endtime;
             while( it_temp != QueueInstruction_new.end() )
             {
-                
-                // print_ins(*it_temp);
-
                 CheckOverallDependency(*it_temp, k_temp-1, false);
-
                 // print_ins(*it_temp);
                 it_temp++;
                 k_temp++;
@@ -368,7 +410,8 @@ void Execute_lw_sw(instruction &ins)
     if(ins.op == "lw")
     {
         CPU_List[j-1].reg[ins.target] = Dram[rownumber][columnnumber];
-        pc.Execution = ins.target + " = " + to_string(Dram[rownumber][columnnumber]);
+        pc.Execution = ins.target + " = " + to_string(Dram[rownumber][columnnumber]); 
+        CPU_List[j-1].regEndTime[ins.target]  = pc.End; // For beq/bne instruction :)
     }
     else 
     {
@@ -381,7 +424,7 @@ void Execute_lw_sw(instruction &ins)
 
     UniversalEndTime = pc.End;
     RowBuffer = ins.row;
-    ins.Endtime = pc.End;
+    ins.Endtime = pc.End;    
 
     // d1("++++++++++++");
     // Registers::print_ins(ins);
@@ -389,8 +432,6 @@ void Execute_lw_sw(instruction &ins)
 
     CPU_List[j-1].ClockCount[pc.End] = 1;
     CPU_List[j-1].DeleteInstruction(ins); // Here j is FileIndex i.e. Actual_j + 1
-    
-
 }
 
 void MemoryManager_Implementation()
@@ -464,7 +505,7 @@ void MemoryManager_Implementation()
 
     for(int i = 0; i < MemoryManager.size(); i++)
     {
-        if(MemoryManager[i].issued) MemoryManager_Issued.pb(MemoryManager[i]);
+        if( MemoryManager[i].issued) MemoryManager_Issued.pb(MemoryManager[i]);
     }
 
     for(int i=0;i<MemoryManager_Issued.size();i++)
@@ -554,7 +595,9 @@ int main(int argc, char * argv[]){
         string filename = BaseFilename + to_string(i+1);
         bool result = openFile(filename, i+1);
         if(!result)return -1;
+        // d1(CPU_List.size());
         CPU_List[i].parse();
+        // d1("H");
 
         if(flag){
             cout << CPU_List[i].print_msg;
@@ -582,14 +625,24 @@ int main(int argc, char * argv[]){
 
         for(int j = 0; j < CPU; j++)
         {                    
-            // cout << "Hey0\n";
-            instruction ins = CPU_List[j].parse_new();
+            // No need the read the remaining instructions in this file (if any)
+            if(CPU_List[j].i >= CPU_List[j].instr.size() || CPU_List[j].EndTime >= SIMULATION_TIME)continue;
             
-            if(ins.cost == 0){
-                // CPU_List[j].EndTime++;
-                continue; // Means file has been read completely
+            // Limit the Queue Size
+            // Basically, we are stalling that Core for which QUEUE_CAPACITY HAS BEEN REACHED
+            if( CPU_List[j].QueueInstruction_new.size() == QUEUE_CAPACITY)
+            {
+                check = true; // Will take into account the case when all files have reached the QUEUE_CAPACITY but have some intructions unread.
+                continue;
             }
-            check = true;            
+
+            instruction ins = CPU_List[j].parse_new();            
+            
+            // if(ins.cost == 0){
+            //     // CPU_List[j].EndTime++;
+            //     continue; // Means file has been read completely
+            // }
+            check = true;
 
             for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); k++)
             {
@@ -683,25 +736,28 @@ int main(int argc, char * argv[]){
 
         bool MemoryManagerActive = true;
         
-        if(DramRequestIssued_Vector.size() > 0)
-        {
-            auto lw_sw_instr = DramRequestIssued_Vector[ rand() % DramRequestIssued_Vector.size() ];
-            int jFileIndex = lw_sw_instr.FileIndex-1;
-            CPU_List[jFileIndex].DramRequestIssued( lw_sw_instr );
+        // if(DramRequestIssued_Vector.size() > 0)
+        // {
+        //     // cout << "HEY\n";
+        //     auto lw_sw_instr = DramRequestIssued_Vector[ rand() % DramRequestIssued_Vector.size() ];
+        //     int jFileIndex = lw_sw_instr.FileIndex-1;
+        //     CPU_List[jFileIndex].DramRequestIssued( lw_sw_instr );
 
-            for(int z = 0; z < DramRequestIssued_Vector.size(); z++)
-            {
-                if(!DramRequestIssued_Vector[z].issued)
-                {
-                    CPU_List[jFileIndex].i--;
-                    CPU_List[jFileIndex].print_count--;
-                    CPU_List[jFileIndex].QueueInstruction_new.erase(CPU_List[jFileIndex].QueueInstruction_new.end()-1);
-                    CPU_List[jFileIndex].EndTime++;
-                }
-            }
+        //     for(int z = 0; z < DramRequestIssued_Vector.size(); z++)
+        //     {
+        //         if(!DramRequestIssued_Vector[z].issued)
+        //         {
+        //             CPU_List[jFileIndex].i--;
+        //             CPU_List[jFileIndex].print_count--;
+        //             CPU_List[jFileIndex].QueueInstruction_new.erase(CPU_List[jFileIndex].QueueInstruction_new.end()-1);
+        //             CPU_List[jFileIndex].EndTime++;
+        //         }
+        //     }
 
-            MemoryManagerActive = false;
-        }
+        //     MemoryManagerActive = false;
+        // }
+
+
         // cout << MemoryManager.size() << endl;
 
         // cout << "Hey1\n";

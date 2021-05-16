@@ -86,6 +86,7 @@ struct instruction{
     bool issued = false;
     int FileIndex = -1;
     int Endtime = -1; //  For lw/sw instruction
+    bool active = true;
 
     vector<pair<int,int> > dependent; // Can be of length at most 4.
     // Different index will contain different instructions 
@@ -106,7 +107,7 @@ class Registers{
         string print_msg = "";
         map<string,int> reg, label;
         map<string,pair<int,int> > RegisterUpdation, RegisterUse;
-        map<string,int> InstructionCountVector;
+        map<string,int> InstructionCountVector, regEndTime;
         vector<instruction> instr;
         vector<instruction> QueueInstruction;
         vector<PrintCommand> Command;

@@ -1,0 +1,23 @@
+{% comment %} Branch Prediction {% endcomment %}
+
+Check for Higher number of Cores
+
+{% comment %} Limit the Queue Size -> Done (Will automatically limit the MRM size)       ( Capacity of the Queue ) {% endcomment %}
+
+{% comment %} Maximize the throughput {% endcomment %}
+
+{% comment %} Add the upper limit on the number of cycles ( Simulation Time       ) 
+        <= Tackle the case in which you have an infinte loop after M cycles 
+        <= So, you can't execute complete file and then print just first M Instructions {% endcomment %}
+
+Estimate the delay (in clock cycles) of your own Memory Request Manager
+algorithm and incorporate it into your timing model. Justify the estimation.
+Remember this is an estimate. You don’t have to design the entire manager
+hardware.
+
+
+    Multicore functionality [7 Marks]
+    Throughput efficiency [5 Marks]
+    Delay estimation and its incorporation [5 Marks]
+    Comprehensiveness of testing [5 Marks]
+    Documentation [3 Marks]
