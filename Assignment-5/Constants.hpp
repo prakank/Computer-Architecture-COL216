@@ -8,7 +8,7 @@
 #define SEPARATE_ROWS         false
 
 
-int CPU = 2;
+int CPU = 1;
 std::string BaseFilename = "t";
 std::string InputDir = "Input/";
 

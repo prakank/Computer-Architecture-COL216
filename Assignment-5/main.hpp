@@ -39,6 +39,8 @@ map<int,pair<int,int> > MemoryUpdation, MemoryUse;
 vector<vector<int> > Dram;
 int UniversalIssueTime[UNIVERSAL_ISSUE_TIME];
 
+int MRM_Delay = 0;
+int InstructionCount = 0; // Throughput
 
 int RowDelay           = 10;
 int ColumnDelay        = 2;
@@ -88,6 +90,7 @@ struct instruction{
     int FileIndex = -1;
     int Endtime = -1; //  For lw/sw instruction
     bool active = true;
+    bool done = false;
 
     vector<pair<int,int> > dependent; // Can be of length at most 4.
     // Different index will contain different instructions 

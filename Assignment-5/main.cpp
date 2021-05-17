@@ -1,13 +1,15 @@
 #include "main.hpp"
 #include "HelperFunctions.hpp"
 
+#define MINIMUM_COST RowDelay + ColumnDelay + 1
 
 vector<PrintCommand> output;
 vector<instruction> MemoryManager;
 
-int InstructionCount = 0; // Throughput
 instruction LatestInstructionIssued;
-
+vector<instruction> MemoryManager_Issued_MinCost;
+vector<instruction> MemoryManager_Issued_HighCost;
+bool Instruction_HighCost_Available = false;
 
 void Registers::CheckDependency_add(instruction &Current_ins, int maxIndexTocheck, bool Update)
 {
@@ -436,6 +438,87 @@ void Execute_lw_sw(instruction &ins)
     CPU_List[j-1].DeleteInstruction(ins); // Here j is FileIndex i.e. Actual_j + 1
 }
 
+void CheckDependency_HighCost(instruction ins, vector<instruction> &v, bool HighCost = false)
+{
+    int MinVal = MINIMUM_COST;
+    if(HighCost)
+    {        
+        vector<instruction>::iterator it = v.begin();
+        while(it<v.end() && !EqualityInstruction_New(ins, *it) )it++;it++;
+        
+        int ind = 0;
+        while(it!=v.end())
+        {
+            if(it->FileIndex == ins.FileIndex)
+            {
+                if(ins.op == "lw")
+                {
+                    if(ins.target == it->target || ins.target == it->source1 || ins.target == it->source2)
+                    {
+                        ind*=2;
+                        ind = max(ind, 1);
+                        it->cost -= (MinVal * ind);
+                    }
+                }
+                else
+                {
+                    if(ins.op == "lw" && ins.target == it->target)
+                    {
+                            ind*=2;
+                            ind = max(ind, 1);
+                            it->cost -= (MinVal * ind);
+                    }
+                }
+                it++;
+            }
+        }
+        return;
+    }
+
+    vector<instruction>::iterator it = v.begin(), it_temp = v.begin();
+    int ind = 0;
+    while(it!=v.end())
+    {
+        if(it->FileIndex == ins.FileIndex)
+        {
+            // Need to check whether v[i]/it is dependent on ins
+            /*
+                    ins
+                    ...
+                    ...
+                    ...
+                    it/v[i]
+            */
+           // add, sub, mul, addi, slt, beq, bne, j, lw, sw
+           if(ins.op == "lw")
+           {
+               if(ins.target == it->target || ins.target == it->source1 || ins.target == it->source2)
+               {
+                   ind*=2;
+                   ind = max(ind, 1);
+                //    d5(it->cost, MinVal, ind, MinVal*ind, it->cost - (MinVal*ind));
+                   it->cost = it->cost - (MinVal * ind);
+
+               }
+           }
+           else
+           {
+               if(ins.op == "lw" && ins.target == it->target)
+               {
+                    ind*=2;
+                    ind = max(ind, 1);
+                    it->cost -= (MinVal * ind);
+               }
+            }
+            if(it->cost == MinVal)Instruction_HighCost_Available = true;
+
+        }
+        it++;
+        it_temp++;
+    
+    }
+}
+
 void MemoryManager_Implementation()
 {
 
@@ -506,46 +589,46 @@ void MemoryManager_Implementation()
     // LatestInstructionIssued stores the instruction which has been issued in the current cycle.
     // This instruction will be pushed to the array 1 or 2, depending on the cost of this instruction    
 
-    vector<instruction> MemoryManager_Issued;
-
-
-    MinCost = INT_MAX;
-    vector<instruction>Issued_Instr;
-
-    for(int i = 0; i < MemoryManager.size(); i++)
+    if(LatestInstructionIssued.cost == MINIMUM_COST)
     {
-        if( MemoryManager[i].issued) MemoryManager_Issued.pb(MemoryManager[i]);
-    }
-
-    for(int i=0;i<MemoryManager_Issued.size();i++)
-    {
-        MinCost = min(MinCost, MemoryManager_Issued[i].cost);
-    }
-
-    for(int i=0;i<MemoryManager_Issued.size();i++)
-    {
-        if(MemoryManager_Issued[i].cost == MinCost)
+        if(LatestInstructionIssued.row == RowBuffer && MemoryManager_Issued_MinCost.size() > 0)
         {
-            Issued_Instr.pb(MemoryManager_Issued[i]);
+            MemoryManager_Issued_MinCost.insert(MemoryManager_Issued_MinCost.begin(), LatestInstructionIssued);
         }
+        else
+        {
+            MemoryManager_Issued_MinCost.pb(LatestInstructionIssued);
+        }
+        // So, if the issued instruction is of minimum cost, we check if the row of this instruction matches with the RowBuffer
+        // If yes, we append it to the front, else, we push it to the back
+    }
+    else if(LatestInstructionIssued.cost != 0) // Just to check that whether an instruction has been Issued in this cycle or not
+    {
+        MemoryManager_Issued_HighCost.pb(LatestInstructionIssued);
     }
 
-    MemoryManager_Issued = Issued_Instr;
+    bool Executed = false;
+    instruction InstructionExecuted;
 
-    if(MemoryManager_Issued.size() > 0)
+    // VectorOutput(MemoryManager_Issued_MinCost, "MinCost", -1);
+    // VectorOutput(MemoryManager_Issued_HighCost, "HighCost", -1);
+    
+    // bool flag = false;
+
+    bool Down_else_block = false;
+
+    if(MemoryManager_Issued_MinCost.size() > 0)
     {
         if(UniversalEndTime == -1)
         {
-            instruction ins = MemoryManager_Issued[rand() % MemoryManager_Issued.size()];
-            Execute_lw_sw(ins); // UniversalEndTime == -1 => this is the first lw/sw instruction
-                                // i.e., I need not check which instruction to execute in this
-                                // So no MRM delay involved
-            return;
+            InstructionExecuted = MemoryManager_Issued_MinCost[0];
+            Execute_lw_sw(MemoryManager_Issued_MinCost[0]);
+            Executed = true;
         }
         else
         {
             bool wait = false;
-            
+    
             for(int j=0; j < CPU; j++)
             {
                 // For files completely parsed
@@ -558,77 +641,93 @@ void MemoryManager_Implementation()
 
             if(!wait)
             {
-                // Ready to execute an instruction in Memory Manager.
-                bool SameRow = false;
-                for(int j=0; j < MemoryManager_Issued.size(); j++)
-                {
-                    if(MemoryManager_Issued[j].row == RowBuffer)
-                    {
-                        Execute_lw_sw(MemoryManager_Issued[j]);
-                        SameRow = true;
-                        break;
-                    }
-                }
-                if(!SameRow)
-                {
-                    instruction ins = MemoryManager_Issued[rand() % MemoryManager_Issued.size()];
-                    Execute_lw_sw(ins);
-                }
+                // Will execute the first instruction in MemoryManager_Issued_MinCost
+                InstructionExecuted = MemoryManager_Issued_MinCost[0];
+                Execute_lw_sw(MemoryManager_Issued_MinCost[0]);                
+                Executed = true;                
+            }            
+        }        
+    }
+    else if(MemoryManager_Issued_HighCost.size() > 0 && !Executed)
+    {
+        bool wait = false;    
+        for(int j=0; j < CPU; j++)
+        {
+            // For files completely parsed
+            // Just keeping up them with the Current clock cycle
+            if(CPU_List[j].EndTime < UniversalEndTime && CPU_List[j].i >= CPU_List[j].instr.size() ) CPU_List[j].EndTime = UniversalEndTime;  
+            else if(CPU_List[j].i < CPU_List[j].instr.size() && CPU_List[j].EndTime  < UniversalEndTime ){
+                wait = true;
             }
-            // Meanwhile your DRAM is not free to execute another instruction, MRM will decide among the lw/sw instructions Issued, that which instruction is to be executed next.
-            else
+        }
+
+        if(!wait)
+        {
+            vector<instruction>::iterator it = MemoryManager_Issued_HighCost.begin();
+
+            while(it!=MemoryManager_Issued_HighCost.end())
             {
-                // MemoryManager_Issued
+                if(it->cost == MINIMUM_COST)
+                {
+                    it->done = true;
+
+                    if(RowBuffer == it->row)
+                    {
+                        MemoryManager_Issued_MinCost.insert(MemoryManager_Issued_MinCost.begin(), *it);
+                    }
+                    else
+                    {
+                        MemoryManager_Issued_MinCost.pb(*it);
+                    }
+                    // MemoryManager_Issued_HighCost.erase(it);
+                }
+                it++;
             }
 
-        }
+            it = MemoryManager_Issued_HighCost.begin();
+            while(it!=MemoryManager_Issued_HighCost.end())
+            {
+                if(it->cost == MINIMUM_COST && it->done == true)
+                {
+                    CheckDependency_HighCost(*it, MemoryManager_Issued_HighCost, true);                    
+                    MemoryManager_Issued_HighCost.erase(it);
+                }
+                else
+                {
+                    it++;
+                }
+            }
+
+            InstructionExecuted = MemoryManager_Issued_MinCost[0];
+            Execute_lw_sw(MemoryManager_Issued_MinCost[0]);                
+            Executed = true;     
+            Down_else_block = true;           
+        }            
     }
 
-    /*
-
-    We have MemoryManager Vector
-    This will contain all lw/sw instructions ( Not just minimum)
-
-    Make a vector containing non-issued instructions and select one out of them and issue Dram request
-    ( Implement Random selection ... Optimize it later )
-
-    Iterate over MemoryManager and store issued instructions in some other vector
-    Select one out of them using some algorithm and execute it (if possible)
-
-
-
-    */
+    if(Executed && MemoryManager_Issued_HighCost.size() > 0)
+    {        
+        MRM_Delay += MemoryManager_Issued_HighCost.size();
+        MemoryManager_Issued_MinCost.erase(MemoryManager_Issued_MinCost.begin());
+        if(!Down_else_block)
+        {
+            CheckDependency_HighCost(InstructionExecuted, MemoryManager_Issued_HighCost);
+        }
+        else
+        {
+            // MRM_Delay += MemoryManager_Issued_HighCost.size();
+        }
+        
+                
+        // Now, I need to delete the first instruction in MemoryManagerMinCost
+        // and need to update the cost values in MemoryManagerHighCost
+    }
+    else if(Executed)
+    {
+        MemoryManager_Issued_MinCost.erase(MemoryManager_Issued_MinCost.begin());
+    }    
 }
 
-/*
-
-So, MRM will have 2 arrays of fixed length
-1st one will contain all the instructions
-2nd one will contain all the instructions with minimum cost
-
-According to the implementation, it is guaranteed that minimum cost instruction will be an independent instruction
-
-It will keep a counter of minimum cost
-
-Assuming, MRM is intact and gets at max one lw/sw instruction in one cycle
-
-Now, each time an instruction is pushed to MRM, MRM will check whether this instruction is of minimum cost or not
-If yes, then it will directly push it to 2nd array and run some algo
-If no, then it will push it to the 1st array
-
-When instruction is to be pushed in 2nd array, we need to just check if this instruction has same row or not.
-If yes, we have found the best possible case for throughput efficiency
-If no, just push it to the 2nd vector
-Now, when the DRAM has finished executing the previous instruction and we were not able to find the instruction with same row.
-We need to choose any random instruction from the 2nd vector (Because all will cause same delay)
-Now, while executing this instruction, we will delete the instruction from 1st array (Negligible time as we know the index)
-MRM Delay will come into picture while resolving the dependcies removed due to the execution of the current instruction.
-We need to update the cost of instructions in 1st array and check whether we can push them into 2nd array or not and repeat the same algo for 2nd array (as we did above)
-
-
-Incorporate Delay for the Delete Instruction (Need to iterate and also Resolve the Dependency)
-
-*/
 
 int main(int argc, char * argv[]){
 
@@ -703,22 +802,6 @@ int main(int argc, char * argv[]){
                     k--;
                     k = max(0,k);
                 }                
-                // else if( (CPU_List[j].QueueInstruction_new[k].op == "lw" || CPU_List[j].QueueInstruction_new[k].op == "sw") && 
-                //     !CPU_List[j].QueueInstruction_new[k].issued)
-                // {
-                //     if(CPU_List[j].ClockCount[UniversalInstructionRead] == 0)
-                //     {
-                //         DramRequestIssued_Vector.pb(CPU_List[j].QueueInstruction_new[k]);
-                //     }
-                //     else
-                //     {
-                //         CPU_List[j].i--;
-                //         CPU_List[j].print_count--;
-                //         CPU_List[j].QueueInstruction_new.erase(CPU_List[j].QueueInstruction_new.end()-1);
-                //         CPU_List[j].EndTime++;
-                //     }
-                //     // CPU_List[j].DramRequestIssued(CPU_List[j].QueueInstruction_new[k]);                    
-                // }
             }            
 
             int k_temp = 0;
@@ -744,84 +827,15 @@ int main(int argc, char * argv[]){
             int cst = INT_MAX;
             instruction temp;            
 
-            // for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); k++)
-            // {
-            //     if(CPU_List[j].QueueInstruction_new[k].cost < cst)
-            //     {
-            //         temp = CPU_List[j].QueueInstruction_new[k];
-            //         cst = CPU_List[j].QueueInstruction_new[k].cost;
-            //     }
-            //     CPU_List[j].QueueInstruction_new[k].FileIndex = j+1;
-            // }
-
-            // for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); k++)
-            // {
-            //     try{
-            //         if(CPU_List[j].QueueInstruction_new[k].cost == cst && (CPU_List[j].QueueInstruction_new[k].op[1] == 'w'))
-            //         {
-            //             MemoryManager.pb(CPU_List[j].QueueInstruction_new[k]);
-            //         }
-            //     }
-            //     catch (...)
-            //     {
-            //         cout << CPU_List[j].QueueInstruction_new[k].op << endl;
-            //         return -1;
-            //     }
-                
-            // }
-
-            // VectorOutput(CPU_List[j].QueueInstruction_new, "Queue", j+1);
-            // cout << "Hey0\n";
-            
-            // if(cst != INT_MAX)MemoryManager.pb(temp);
-
         }
 
-        // vector<instruction> DramRequestIssued_Vector_Available;
-
-        // d1(DramRequestIssued_Vector.size());
-        // d1(rand() % DramRequestIssued_Vector.size());
-
         bool MemoryManagerActive = true;
-        
-        // if(DramRequestIssued_Vector.size() > 0)
-        // {
-        //     // cout << "HEY\n";
-        //     auto lw_sw_instr = DramRequestIssued_Vector[ rand() % DramRequestIssued_Vector.size() ];
-        //     int jFileIndex = lw_sw_instr.FileIndex-1;
-        //     CPU_List[jFileIndex].DramRequestIssued( lw_sw_instr );
-
-        //     for(int z = 0; z < DramRequestIssued_Vector.size(); z++)
-        //     {
-        //         if(!DramRequestIssued_Vector[z].issued)
-        //         {
-        //             CPU_List[jFileIndex].i--;
-        //             CPU_List[jFileIndex].print_count--;
-        //             CPU_List[jFileIndex].QueueInstruction_new.erase(CPU_List[jFileIndex].QueueInstruction_new.end()-1);
-        //             CPU_List[jFileIndex].EndTime++;
-        //         }
-        //     }
-
-        //     MemoryManagerActive = false;
-        // }
-
-
-        // cout << MemoryManager.size() << endl;
-
-        // cout << "Hey1\n";
-        // return 0;
-
-        // VectorOutput(MemoryManager, "MemoryManager", -1);        
 
         if(MemoryManagerActive)
         {
             MemoryManager_Implementation();
         }
 
-        // cout << "Hey2\n";
-
-        // stop--;
-        // if(stop==0)break;
         if(!check)break;
     }
 
@@ -832,11 +846,8 @@ int main(int argc, char * argv[]){
     // d1("Hello");
     // return 0;
 
-    // cout << "H";
     while(true)
     {
-        // cout << "Hey\n";
-
         MemoryManager.clear();
         
         for(int j=0;j<CPU;j++)
@@ -861,15 +872,6 @@ int main(int argc, char * argv[]){
                     k_temp++;
                 }
             }
-
-            // for(int k = 0; k < CPU_List[j].QueueInstruction_new.size(); ++k)
-            // {
-            //     if(CPU_List[j].QueueInstruction_new[k].cost == 1){
-            //         CPU_List[j].Execute_1(j+1, CPU_List[j].QueueInstruction_new[k]);
-            //         k--;
-            //         k = max(0,k);
-            //     }
-            // }
 
             int cst = INT_MAX;
             instruction temp;            

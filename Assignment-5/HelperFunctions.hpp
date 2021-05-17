@@ -241,7 +241,8 @@ void FinalPrint(vector<PrintCommand> output)
     cout << "CORES: " << CPU << "\n";
     cout << "ROW_ACCESS_DELAY: " << RowDelay << "\n";
     cout << "COLUMN_ACCESS_DELAY: " << ColumnDelay << "\n";
-    cout << "Clock Cycles with Last Row Writeback(if any): " << min(output[output.size()-1].End, SIMULATION_TIME) << "\n\n";
+    cout << "Clock Cycles with Last Row Writeback(if any): " << min(output[output.size()-1].End, SIMULATION_TIME) << "\n";
+    cout << "Memory Request Manager Delay: " << MRM_Delay << "\n\n";
     cout << "Cycle Wise Analysis\n\n";
     cout << boost::format("%-15s %-8s %-55s %-50s\n") % "Cycle Count" % "File" %"Instruction" % "Register/Memory/Request";
 
@@ -307,6 +308,19 @@ bool Registers::EqualityInstruction(instruction a, instruction b)
         )return true;
     return false;
 }
+
+bool EqualityInstruction_New(instruction a, instruction b)
+{
+    if(/* a.cost == b.cost && */ 
+        a.FileIndex == b.FileIndex &&
+        a.fun_label == b.fun_label &&
+        a.InstructionCount == b.InstructionCount && a.InstructionRead == b.InstructionRead &&
+        a.jump == b.jump && a.offset == b.offset && a.op == b.op && a.original == b.original 
+        && a.source1 == b.source1 && a.source2 == b.source2 && a.target == b.target
+        )return true;
+    return false;
+}
+
 
 void Registers::ResolveDependency(instruction &ins){
     
@@ -1151,10 +1165,12 @@ int input(int argc, char * argv[])
 
 void VectorOutput(vector<instruction> v, string Name, int j)
 {
-    if(j!=-1)cout << Name << "Start " << j;
-    else cout << Name << "Start ";
-    cout << ", " << v.size() << endl;
-    cout << RowBuffer << "\n";
+    if(j!=-1)cout << Name << "_Start " << j;
+    else cout << Name << "_Start ";
+    cout << ", Size: " << v.size() << endl;
+    cout << "RowInBuffer: " << RowBuffer << "\n";
+    cout << "UniversalEndTime: " << UniversalEndTime << "\n";
+
     for(int p = 0; p < v.size(); p++)
         {
             if(j == -1)cout << v[p].original << ", Cost: " << v[p].cost << ", Row: " << v[p].row << ", EndTime: " << v[p].Endtime << "\n";
