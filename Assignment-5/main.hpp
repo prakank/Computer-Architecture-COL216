@@ -15,6 +15,7 @@
 #include<boost/format.hpp> 
 
 #include "Constants.hpp"
+#define CLOCK_CHECK           SIMULATION_TIME * 10 // To avoid writing at same clock cycle
 
 #define ff              first
 #define pb              push_back

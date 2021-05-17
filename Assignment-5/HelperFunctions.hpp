@@ -97,14 +97,17 @@ void Registers::std_registers(){
 }
 
 bool Registers::Comparator(PrintCommand a, PrintCommand b){
+    
     if(a.End!=b.End)    return a.End   < b.End;
     if(a.Start!=b.Start)return a.Start < b.Start;
+    if(BaseFilename == "")return stoi(a.File) < stoi(b.File);
     vector<string> temp1, temp2;
     boost::split(temp1, a.File, boost::is_any_of(BaseFilename));
     boost::split(temp2, b.File, boost::is_any_of(BaseFilename));
     // cout << "Size: " << temp1.size() << ", 1st: " << temp1[0] << ", 2nd: " << temp1[1] << endl;
     // cout << temp2.size() << "  " << temp2[0] << endl;
     return stoi(temp1[1]) < stoi(temp2[1]);
+
 }
 
 bool Registers::is_number(const string& s)
@@ -221,6 +224,8 @@ void Registers::Printing(){
 
 void FinalPrint(vector<PrintCommand> output)
 {   
+    // d1(output.size());
+
     sort(output.begin(),output.end(),Registers::Comparator);
 
     if(RowBuffer != -1)
@@ -286,7 +291,7 @@ void FinalPrint(vector<PrintCommand> output)
 
     cout << "Program Statistics\n";
 
-    cout << "Instruction Throughput : " << float(TotalInstructions)/float(min(output[output.size()-1].End, SIMULATION_TIME)) << "\n";
+    cout << "Instruction Throughput : " << setprecision(4) << float(TotalInstructions)/float(min(output[output.size()-1].End, SIMULATION_TIME)) << "\n";
 
     cout << "Row Buffer Updates : " << RowBufferUpdates << endl;
     
@@ -1070,6 +1075,15 @@ void Registers::tokenize(string s, int jFileIndex){
         if(i == tokens[1].size() || tokens[1][i]!='('){flag=true;print_msg = "ERROR : Syntax Error\n";return;}
         ins.offset = s;
 
+        // try
+        // {
+        //     int x = stoi(s);
+        // }
+        // catch(const std::exception& e)
+        // {
+        //     cout << "Overflow\n";
+        // }
+        
         
         if(SEPARATE_ROWS)
         {

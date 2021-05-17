@@ -6,6 +6,8 @@ vector<PrintCommand> output;
 vector<instruction> MemoryManager;
 
 int InstructionCount = 0; // Throughput
+instruction LatestInstructionIssued;
+
 
 void Registers::CheckDependency_add(instruction &Current_ins, int maxIndexTocheck, bool Update)
 {
@@ -238,13 +240,13 @@ void Registers::Execute_1(int j, instruction ins)
 
     // cout << EndTime << endl;
 
-    if(ins.op == "add")reg[ins.target] = reg[ins.source1] + reg[ins.source2];
-    if(ins.op == "sub")reg[ins.target] = reg[ins.source1] - reg[ins.source2];
-    if(ins.op == "mul")reg[ins.target] = reg[ins.source1] * reg[ins.source2];
-    if(ins.op == "slt"){
-        if( reg[ins.source1] < reg[ins.source2] ) reg[ins.target] = 1;
-        else reg[ins.target] = 0;
-    }
+    // if(ins.op == "add")reg[ins.target] = reg[ins.source1] + reg[ins.source2];
+    // if(ins.op == "sub")reg[ins.target] = reg[ins.source1] - reg[ins.source2];
+    // if(ins.op == "mul")reg[ins.target] = reg[ins.source1] * reg[ins.source2];
+    // if(ins.op == "slt"){
+    //     if( reg[ins.source1] < reg[ins.source2] ) reg[ins.target] = 1;
+    //     else reg[ins.target] = 0;
+    // }
 
 
 
@@ -252,6 +254,7 @@ void Registers::Execute_1(int j, instruction ins)
     pc.Start = pc.End = ind;
     pc.Command = ins.original;
     pc.Execution = InstructionExecution(ins);
+    // pc.Execution = ins.target + " = " + to_string(reg[ins.target]);
     pc.File = BaseFilename + to_string(j);
     output.pb(pc);
 
@@ -347,7 +350,6 @@ void Registers::DeleteInstruction(instruction &ins)
         CheckOverallDependency(*it,k);
         it++;k++;
     }
-
 }
 
 void Execute_lw_sw(instruction &ins)
@@ -465,13 +467,15 @@ void MemoryManager_Implementation()
 
     MemoryManager_NotIssued = Notissued;
 
+    LatestInstructionIssued.cost = 0;
+
     if( MemoryManager_NotIssued.size() > 0)
     {
         if(UniversalEndTime == -1)
         {
             instruction ins = MemoryManager_NotIssued[rand() % MemoryManager_NotIssued.size()];
             CPU_List[ins.FileIndex-1].DramRequestIssued(ins);
-
+            LatestInstructionIssued = ins;
         }
         else
         {
@@ -484,8 +488,9 @@ void MemoryManager_Implementation()
                 MemoryManager_NotIssued[i].row = int(x / ColumnMemory);                
                 if(RowBuffer == MemoryManager_NotIssued[i].row)
                 {
-                    CPU_List[ins.FileIndex-1].DramRequestIssued(MemoryManager_NotIssued[i]);
+                    CPU_List[ins.FileIndex-1].DramRequestIssued(MemoryManager_NotIssued[i]);                    
                     issued = true;
+                    LatestInstructionIssued = MemoryManager_NotIssued[i];
                     break;
                 }
             }
@@ -493,9 +498,13 @@ void MemoryManager_Implementation()
             {
                 instruction ins = MemoryManager_NotIssued[rand() % MemoryManager_NotIssued.size()];
                 CPU_List[ins.FileIndex-1].DramRequestIssued(ins);
+                LatestInstructionIssued = ins;
             }
         }
     }
+
+    // LatestInstructionIssued stores the instruction which has been issued in the current cycle.
+    // This instruction will be pushed to the array 1 or 2, depending on the cost of this instruction    
 
     vector<instruction> MemoryManager_Issued;
 
@@ -528,7 +537,9 @@ void MemoryManager_Implementation()
         if(UniversalEndTime == -1)
         {
             instruction ins = MemoryManager_Issued[rand() % MemoryManager_Issued.size()];
-            Execute_lw_sw(ins);
+            Execute_lw_sw(ins); // UniversalEndTime == -1 => this is the first lw/sw instruction
+                                // i.e., I need not check which instruction to execute in this
+                                // So no MRM delay involved
             return;
         }
         else
@@ -537,6 +548,8 @@ void MemoryManager_Implementation()
             
             for(int j=0; j < CPU; j++)
             {
+                // For files completely parsed
+                // Just keeping up them with the Current clock cycle
                 if(CPU_List[j].EndTime < UniversalEndTime && CPU_List[j].i >= CPU_List[j].instr.size() ) CPU_List[j].EndTime = UniversalEndTime;  
                 else if(CPU_List[j].i < CPU_List[j].instr.size() && CPU_List[j].EndTime  < UniversalEndTime ){
                     wait = true;
@@ -562,6 +575,11 @@ void MemoryManager_Implementation()
                     Execute_lw_sw(ins);
                 }
             }
+            // Meanwhile your DRAM is not free to execute another instruction, MRM will decide among the lw/sw instructions Issued, that which instruction is to be executed next.
+            else
+            {
+                // MemoryManager_Issued
+            }
 
         }
     }
@@ -581,6 +599,36 @@ void MemoryManager_Implementation()
 
     */
 }
+
+/*
+
+So, MRM will have 2 arrays of fixed length
+1st one will contain all the instructions
+2nd one will contain all the instructions with minimum cost
+
+According to the implementation, it is guaranteed that minimum cost instruction will be an independent instruction
+
+It will keep a counter of minimum cost
+
+Assuming, MRM is intact and gets at max one lw/sw instruction in one cycle
+
+Now, each time an instruction is pushed to MRM, MRM will check whether this instruction is of minimum cost or not
+If yes, then it will directly push it to 2nd array and run some algo
+If no, then it will push it to the 1st array
+
+When instruction is to be pushed in 2nd array, we need to just check if this instruction has same row or not.
+If yes, we have found the best possible case for throughput efficiency
+If no, just push it to the 2nd vector
+Now, when the DRAM has finished executing the previous instruction and we were not able to find the instruction with same row.
+We need to choose any random instruction from the 2nd vector (Because all will cause same delay)
+Now, while executing this instruction, we will delete the instruction from 1st array (Negligible time as we know the index)
+MRM Delay will come into picture while resolving the dependcies removed due to the execution of the current instruction.
+We need to update the cost of instructions in 1st array and check whether we can push them into 2nd array or not and repeat the same algo for 2nd array (as we did above)
+
+
+Incorporate Delay for the Delete Instruction (Need to iterate and also Resolve the Dependency)
+
+*/
 
 int main(int argc, char * argv[]){
 
